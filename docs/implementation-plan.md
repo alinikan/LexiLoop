@@ -1,5 +1,7 @@
-# Production finalization
+# Maintenance direction
 
-The existing Next.js/Supabase architecture was retained. The audit preceded implementation. Production guards, account recovery, profile preferences, delta persistence, bounded history, provider reliability, Cambridge isolation, responsive layout fixes, and expanded tests were applied to the existing repository.
+LexiLoop already has a GitHub repository and Vercel deployment. Keep the Next.js/Supabase architecture, real accounts, Gmail SMTP for private use and configurable OpenAI generation. Cambridge remains optional.
 
-The current state and limitations are recorded in `production-audit.md` and `verification.md`. The README is the authoritative beginner setup guide. External account creation, live credential verification, licensing approval and public deployment remain operator actions; local tests do not stand in for them.
+The [README](../README.md) is the setup guide. [Architecture](architecture.md) explains implementation invariants. [Production audit](production-audit.md) records the current maintenance changes, and [verification](verification.md) separates local evidence from hosted-service acceptance checks.
+
+Future schema changes should use forward migrations. Before adding services or changing architecture, identify the concrete user need; the current target is a small private vocabulary app.

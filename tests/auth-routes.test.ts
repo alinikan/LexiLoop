@@ -92,3 +92,104 @@ it('does not expose unexpected upstream error details', async () => {
   );
   expect(JSON.stringify(await response.json())).not.toContain('secret-token');
 });
+
+it('registers a valid account and requests confirmation at the configured production origin', async () => {
+  vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://lexiloop-ali.vercel.app');
+  const response = await POST(
+    request(
+      {
+        action: 'signup',
+        email: 'learner@example.com',
+        password: 'long test passphrase',
+        confirmPassword: 'long test passphrase',
+        displayName: 'Learner',
+      },
+      'https://lexiloop-ali.vercel.app',
+    ),
+  );
+  expect(await response.json()).toEqual({ ok: true, confirmation: true });
+  expect(auth.signUp).toHaveBeenCalledWith({
+    email: 'learner@example.com',
+    password: 'long test passphrase',
+    options: {
+      emailRedirectTo: 'https://lexiloop-ali.vercel.app/auth/confirm',
+      data: { display_name: 'Learner' },
+    },
+  });
+});
+it.each([
+  { email: 'invalid', password: 'long test passphrase', confirmPassword: 'long test passphrase' },
+  { email: 'learner@example.com', password: 'short', confirmPassword: 'short' },
+  { email: 'learner@example.com', password: 'long test passphrase', confirmPassword: 'different' },
+])('rejects invalid signup before contacting Supabase', async (fields) => {
+  expect((await POST(request({ action: 'signup', ...fields }))).status).toBe(400);
+  expect(auth.signUp).not.toHaveBeenCalled();
+});
+it('handles duplicate signup without exposing account/provider details', async () => {
+  auth.signUp.mockResolvedValue({ error: { message: 'PRIVATE duplicate account detail' } });
+  const response = await POST(
+    request({
+      action: 'signup',
+      email: 'learner@example.com',
+      password: 'long test passphrase',
+      confirmPassword: 'long test passphrase',
+    }),
+  );
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toContain('password recovery');
+});
+it.each(['invalid_credentials', 'email_not_confirmed'])(
+  'handles %s with the same safe sign-in guidance',
+  async (code) => {
+    auth.signInWithPassword.mockResolvedValue({ error: { code, message: 'PRIVATE' } });
+    const response = await POST(
+      request({ action: 'signin', email: 'learner@example.com', password: 'password' }),
+    );
+    expect((await response.json()).error).toContain('confirm your email');
+  },
+);
+it('accepts sign-in and sign-out and marks auth responses uncached', async () => {
+  for (const body of [
+    { action: 'signin', email: 'learner@example.com', password: 'password' },
+    { action: 'signout' },
+  ]) {
+    const response = await POST(request(body));
+    expect(await response.json()).toEqual({ ok: true });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  }
+});
+it('accepts email confirmation and PKCE recovery while ignoring unsafe next paths', async () => {
+  expect(
+    (
+      await GET(
+        new Request(
+          'https://lexiloop.example/auth/confirm?token_hash=fixture&type=email&next=//attacker.example',
+        ),
+      )
+    ).headers.get('location'),
+  ).toBe('https://lexiloop.example/');
+  expect(
+    (
+      await GET(
+        new Request('https://lexiloop.example/auth/confirm?code=fixture&next=/reset-password'),
+      )
+    ).headers.get('location'),
+  ).toBe('https://lexiloop.example/reset-password');
+});
+it.each(['', '?token_hash=fixture&type=invalid', '?token_hash=expired&type=recovery'])(
+  'rejects invalid callback %s',
+  async (query) => {
+    auth.verifyOtp.mockResolvedValue({ error: { message: 'PRIVATE' } });
+    expect(
+      (await GET(new Request(`https://lexiloop.example/auth/confirm${query}`))).headers.get(
+        'location',
+      ),
+    ).toBe('https://lexiloop.example/login?confirmation=failed');
+  },
+);
+it('rejects missing and lookalike origins in production', async () => {
+  vi.stubEnv('NODE_ENV', 'production');
+  for (const origin of ['', 'https://lexiloop.example.attacker.test'])
+    expect((await POST(request({ action: 'signout' }, origin))).status).toBe(400);
+  expect(auth.signOut).not.toHaveBeenCalled();
+});

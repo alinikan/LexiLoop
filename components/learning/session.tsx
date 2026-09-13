@@ -142,6 +142,7 @@ export function Session({
         <div
           className="progress-track"
           role="progressbar"
+          aria-label="Lesson progress"
           aria-valuenow={index * activeSteps.length + step}
           aria-valuemin={0}
           aria-valuemax={words.length * activeSteps.length}

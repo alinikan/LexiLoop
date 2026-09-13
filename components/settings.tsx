@@ -1,6 +1,7 @@
 'use client';
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { TutorialSettings } from './tutorial';
 import { Bell, Download, ArrowRight, Check, LogOut, Smartphone } from 'lucide-react';
 import { useStore } from './store';
 import { demoMode } from '@/lib/config';
@@ -338,6 +339,7 @@ export function Settings() {
           </button>
         </form>
         <aside className="settings-aside">
+          <TutorialSettings />
           <div className="panel">
             <Smartphone size={27} />
             <h3>Your words, on your Home Screen.</h3>
@@ -373,17 +375,21 @@ export function Settings() {
               <button
                 className="button secondary"
                 onClick={async () => {
-                  const response = await fetch('/api/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'signout' }),
-                  });
-                  if (!response.ok) {
-                    notify('Sign-out failed. Please try again.');
-                    return;
+                  try {
+                    const response = await fetch('/api/auth', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'signout' }),
+                    });
+                    if (!response.ok) {
+                      notify('Sign-out failed. Please try again.');
+                      return;
+                    }
+                    localStorage.setItem('lexiloop-auth-change', String(Date.now()));
+                    window.location.replace('/login');
+                  } catch {
+                    notify('Sign-out failed. Check your connection and try again.');
                   }
-                  localStorage.setItem('lexiloop-auth-change', String(Date.now()));
-                  window.location.replace('/login');
                 }}
               >
                 <LogOut size={17} />

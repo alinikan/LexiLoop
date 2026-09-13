@@ -17,7 +17,8 @@ export async function POST(request: Request) {
       throw new UserError('Please enter just the word.');
     const { word } = z.object({ word: inputWordSchema }).parse(await readJson(request, 1000));
     const seed = catalog.find((w) => w.word === word);
-    if (seed) return NextResponse.json({ word: seed });
+    if (seed)
+      return NextResponse.json({ word: seed }, { headers: { 'Cache-Control': 'no-store' } });
     const db = adminClient();
     const { data: alias, error: aliasError } = await db
       .from('word_aliases')
@@ -32,13 +33,18 @@ export async function POST(request: Request) {
       .eq('word', alias?.word ?? word)
       .maybeSingle();
     if (error) throw new UserError('Word storage is unavailable. Please try again.');
-    if (cached) return NextResponse.json({ word: validateWord(cached.content) });
+    if (cached)
+      return NextResponse.json(
+        { word: validateWord(cached.content) },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     const token = crypto.randomUUID();
     const { data: claimed, error: claimError } = await db.rpc('claim_word_generation', {
       p_word: word,
       p_token: token,
     });
-    if (claimError || !claimed)
+    if (claimError) throw new UserError('Word storage is unavailable. Please try again.');
+    if (!claimed)
       return NextResponse.json(
         { error: 'This word is being prepared. Try again in a moment.' },
         { status: 409, headers: { 'Retry-After': '10', 'Cache-Control': 'no-store' } },
@@ -65,7 +71,9 @@ export async function POST(request: Request) {
       const { data: allowed, error: rateError } = await db.rpc('consume_generation_quota', {
         p_user: user.id,
       });
-      if (rateError || !allowed)
+      if (rateError)
+        throw new UserError('Word generation limits could not be checked. Please try again.');
+      if (!allowed)
         throw new UserError(
           'You have reached today’s 20 new word generations. Try a saved or suggested word, or come back tomorrow.',
         );

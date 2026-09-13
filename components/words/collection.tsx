@@ -274,7 +274,7 @@ export function Collection() {
               <small>
                 {w.tag || w.source} ·{' '}
                 {w.schedule.firstLearned
-                  ? w.schedule.interval >= 30
+                  ? w.schedule.interval >= 30 && w.schedule.confidence >= 3
                     ? 'Mastered'
                     : 'Learning'
                   : 'Saved for later'}

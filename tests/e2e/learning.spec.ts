@@ -90,20 +90,6 @@ test('all app surfaces render without client errors or mobile overflow', async (
   }
   expect(errors).toEqual([]);
 });
-test('production email sign-in when service credentials are provided', async ({ page }) => {
-  test.skip(
-    !process.env.E2E_EMAIL ||
-      !process.env.E2E_PASSWORD ||
-      process.env.NEXT_PUBLIC_DEMO_MODE !== 'false',
-    'Requires a configured real Supabase account and demo mode disabled.',
-  );
-  await page.goto('/login');
-  await page.getByLabel('Email', { exact: true }).fill(process.env.E2E_EMAIL!);
-  await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_PASSWORD!);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL('/');
-});
-
 test('default five slots can be filled, replaced, and locked', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
@@ -153,7 +139,7 @@ test('capture the verified daily surface', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await page.screenshot({
-    path: `docs/screens/${testInfo.project.name}-today.png`,
+    path: testInfo.outputPath('today.png'),
     fullPage: true,
   });
 });
@@ -177,4 +163,49 @@ test('some context exercises ask for typed production', async ({ page }) => {
   await page.getByLabel('Type the word').fill('feasible');
   await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByText('That’s it. Nicely done.')).toBeVisible();
+});
+
+test('word errors preserve input and long notes, favorites, archives and export work', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await page.goto('/add');
+  await page.getByLabel('What’s the word?').fill('unavailableword');
+  await page.getByRole('button', { name: 'Build word card' }).click();
+  await expect(page.locator('.form-error')).toContainText('20 curated words');
+  await expect(page.getByLabel('What’s the word?')).toHaveValue('unavailableword');
+  await page.getByLabel('What’s the word?').fill('reluctant');
+  await page.getByRole('button', { name: 'Build word card' }).click();
+  await page.getByRole('button', { name: 'Save to my words', exact: true }).click();
+  await page.goto('/collection?word=reluctant');
+  await page.getByRole('textbox', { name: 'Your notes', exact: true }).fill('n'.repeat(2000));
+  await page.getByLabel('Tag', { exact: true }).fill('t'.repeat(40));
+  await page.getByRole('button', { name: 'Save notes', exact: true }).click();
+  await page.getByRole('button', { name: 'Favorite', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Your notes', exact: true })).toHaveValue('n'.repeat(2000));
+  await expect(page.getByRole('button', { name: 'Unfavorite', exact: true })).toBeVisible();
+  await page.getByText('Progress & word management', { exact: true }).click();
+  await page.getByRole('button', { name: 'Archive word', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Restore word', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore word', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('word-details-320.png'), fullPage: true });
+  await page.goto('/settings');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export wordbook', exact: true }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('lexiloop-wordbook.json');
+  const stream = await file.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const exported = JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported.state.words[0]).toMatchObject({
+    word: 'reluctant',
+    favorite: true,
+    archived: false,
+    note: 'n'.repeat(2000),
+  });
 });

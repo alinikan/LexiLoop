@@ -10,12 +10,13 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/test-e2e.mjs",
     "format": "prettier --write .",
     "db:migrate": "node scripts/database.mjs migrate",
     "db:seed": "node scripts/database.mjs seed",
     "check:production": "node scripts/check-production.mjs",
-    "dev:demo": "node scripts/dev-demo.mjs"
+    "dev:demo": "node scripts/dev-demo.mjs",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

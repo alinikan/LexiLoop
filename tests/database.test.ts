@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, it, expect } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { readFile } from 'node:fs/promises';
+import { migrate } from '../scripts/migrations.mjs';
 import { catalog } from '@/data/catalog';
 import { initialState, applyCommand } from '@/lib/domain';
 const user = '10000000-0000-4000-8000-000000000001',
@@ -11,8 +11,11 @@ beforeAll(async () => {
   await db.exec(
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'::jsonb);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users(id) values('${user}'),('${other}');`,
   );
-  await db.exec(await readFile('supabase/migrations/001_initial.sql', 'utf8'));
-  await db.exec(await readFile('supabase/migrations/002_production.sql', 'utf8'));
+  // PGlite is single-process; stand-ins allow the real migration runner to execute.
+  await db.exec(
+    `create function pg_advisory_lock(integer) returns void language sql as 'select'; create function pg_advisory_unlock(integer) returns boolean language sql as 'select true';`,
+  );
+  await migrate(migrationClient());
   for (const word of catalog)
     await db.query('select public.cache_lexical_word($1::jsonb)', [JSON.stringify(word)]);
 }, 20000);
@@ -170,4 +173,83 @@ it('caches input aliases atomically and preserves the first canonical lesson', a
       ])
     ).rows[0].content.scenario,
   ).toBe(content.scenario);
+});
+
+function migrationClient() {
+  return {
+    query: async (sql: string, parameters?: unknown[]) => {
+      if (parameters) return db.query(sql, parameters);
+      const results = await db.exec(sql);
+      return results.at(-1) ?? { rows: [] };
+    },
+  };
+}
+it('records migrations in the ledger and safely skips a second run', async () => {
+  expect((await db.query('select name from lexiloop_migrations order by name')).rows).toEqual([
+    { name: '001_initial.sql' },
+    { name: '002_production.sql' },
+  ]);
+  expect(await migrate(migrationClient())).toEqual([]);
+  expect(
+    (
+      await db.query(
+        "select tablename from pg_tables where schemaname='public' and not rowsecurity",
+      )
+    ).rows,
+  ).toEqual([]);
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${other}';`);
+  await expect(db.query('select * from lexiloop_migrations')).rejects.toThrow('permission denied');
+  await db.exec('reset role');
+});
+it('denies other-user daily sets, items, feedback and quotas and anonymous lexical reads', async () => {
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${other}';`);
+  for (const table of [
+    'daily_word_sets',
+    'daily_word_set_items',
+    'suggestion_feedback',
+    'generation_quotas',
+  ])
+    expect((await db.query(`select * from ${table}`)).rows).toEqual([]);
+  for (const rpc of [
+    "consume_generation_quota('10000000-0000-4000-8000-000000000001')",
+    "release_word_generation('hello','10000000-0000-4000-8000-000000000001')",
+  ])
+    await expect(db.query(`select ${rpc}`)).rejects.toThrow('permission denied');
+  await db.exec('reset role;set role anon');
+  await expect(db.query('select * from words')).rejects.toThrow('permission denied');
+  await db.exec('reset role');
+});
+it('reclaims expired leases without allowing an old owner to release the new lease', async () => {
+  await db.query(
+    "update word_generation_leases set expires_at=now()-interval '1 second' where word='hello'",
+  );
+  expect(
+    (await db.query('select claim_word_generation($1,$2) claimed', ['hello', user])).rows,
+  ).toEqual([{ claimed: true }]);
+  await db.query('select release_word_generation($1,$2)', ['hello', other]);
+  expect(
+    (await db.query('select claim_word_generation($1,$2) claimed', ['hello', other])).rows,
+  ).toEqual([{ claimed: false }]);
+});
+
+it('rolls back failed schema changes together with their ledger entry', async () => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const folder = await mkdtemp(join(tmpdir(), 'lexiloop-migration-'));
+  try {
+    await writeFile(
+      join(folder, '999_failure.sql'),
+      'create table must_rollback(id integer); select nonexistent_function();',
+    );
+    await expect(migrate(migrationClient(), folder)).rejects.toThrow();
+    expect((await db.query("select to_regclass('public.must_rollback') result")).rows).toEqual([
+      { result: null },
+    ]);
+    expect(
+      (await db.query("select name from lexiloop_migrations where name='999_failure.sql'")).rows,
+    ).toEqual([]);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { Tutorial } from '../tutorial';
 import { usePathname } from 'next/navigation';
 import {
   Home,
@@ -98,6 +99,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main id="main">
+          {ready && <Tutorial key={path} path={path} />}
           {offline && (
             <div className="notice">
               You’re offline.{' '}

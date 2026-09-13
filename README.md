@@ -2,352 +2,402 @@
 
 **Small steps. Lasting words.**
 
-Documentation last verified: **2026-09-12**
+LexiLoop helps you learn useful English words and remember them through short daily lessons and scheduled review. Save a word from your own life, choose suggestions, practice it in context, and return when it is due for another review.
 
-LexiLoop is a Next.js vocabulary app for individual email/password accounts. Choose a daily mix of personal and suggested words, complete interactive lessons, and revisit words through spaced repetition. Supabase holds account data; OpenAI creates new lexical lessons; Cambridge is a separate, optional licensed reference.
+[Open LexiLoop](https://lexiloop-ali.vercel.app) · [Source repository](https://github.com/alinikan/LexiLoop)
 
-This is an existing application that has been audited and updated, not a replacement starter project. Start with this guide. The code is locally verified; creating your service accounts, delivering real email, approving Cambridge access, and deploying your public domain still require your own accounts. No credentials are included.
+The current deployment is a small private app hosted on Vercel, with real Supabase accounts, Gmail SMTP delivery through Supabase, and OpenAI lesson generation using `gpt-5.6-terra`. Cambridge API integration is optional and disabled by default. A custom domain, Resend account, and Vercel Marketplace database integration are not required.
 
-Official documentation was checked on the date above. I did not sign into your service dashboards. Some Cambridge pages rejected direct automated retrieval; their official indexed specification, FAQ and terms, plus the accessible registration page, were inspected. The links below let you verify the current pages and your actual agreement. Dashboard wording can vary by account or rollout.
+## Contents
 
-## What you have
+- [What the app does](#what-the-app-does)
+- [How the pieces fit together](#how-the-pieces-fit-together)
+- [Install and run locally](#install-and-run-locally)
+- [Environment variables](#environment-variables)
+- [Supabase database and authentication](#supabase-database-and-authentication)
+- [Gmail SMTP and email templates](#gmail-smtp-and-email-templates)
+- [OpenAI setup and generation](#openai-setup-and-generation)
+- [Optional Cambridge reference](#optional-cambridge-reference)
+- [Vercel deployment](#vercel-deployment)
+- [Testing](#testing)
+- [Post-deployment checklist](#post-deployment-checklist)
+- [Troubleshooting](#troubleshooting)
+- [Security, cost and operations](#security-cost-and-operations)
 
-- Normal signup, sign-in, sign-out, email confirmation, forgot-password and reset-password flows.
-- Private per-user profiles, names, goals, interests, level, timezone, reminders, theme and reduced-motion preference.
-- Personal word preview, notes, original context, tags, priority, saved suggestions, favorites and archives.
-- Atomic save-and-select, daily slot limits, replacement before start, locked started sets, and safe midnight completion.
-- Eight learning phases, varied exercises, personal sentences, confidence, corrective examples, and genuine review scheduling.
-- Database-generated lifetime progress totals; normal loads fetch only recent events/daily sets. Full history is available through an explicit export.
-- OpenAI structured generation with validation/retry, canonical caching, inflection aliases, durable daily quotas and generation leases.
-- A Cambridge section on every word detail. It shows an external link unless licensed API lookup is configured. Cambridge content never enters the lexical database or AI prompt.
-- Responsive mobile layouts, safe-area navigation, PWA icons/manifest, public-asset offline fallback, and honest in-app reminders.
+## What the app does
 
-**Production always disables the device demo and mock provider**, even if an old demo flag remains in your environment. The 20 original editorial starter lessons are reusable curriculum, not invented user activity or Cambridge text. An uncached custom word requires live OpenAI configuration. Your first account starts with no learned words, XP or streak.
+An account starts with an empty personal wordbook and no invented progress. Signup requires email confirmation. Sign-in, sign-out, forgotten-password requests and password changes are supported.
 
-## External-services audit
+Choose a daily goal (five words by default, configurable from one to twenty). Fill it with any mix of personal words and suggestions. You can replace selected words until you start a lesson; starting locks that day's selection. Completed words save individually. Leaving an unfinished word restarts its exercises, and a session already open at midnight retains its original daily set.
 
-| Service                  | Why It Is Needed                                              | Required?                                         | Free/Paid                                                               | Credentials Needed                                                             |
-| ------------------------ | ------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Supabase                 | Email/password authentication and PostgreSQL persistence      | Yes for real accounts                             | Free tier for initial use; paid plans for larger/operational needs      | Project URL, publishable key, secret key; database connection string for setup |
-| OpenAI API               | Generates uncached custom vocabulary lessons                  | Yes for real custom generation                    | Usage billing; any promotional allowance depends on your account        | Project API key and an available structured-output model                       |
-| GitHub                   | Stores source and connects automatic deployments              | Yes for this deployment workflow                  | Free repositories are sufficient                                        | Your GitHub login; local Git authentication, not an app environment variable   |
-| Vercel                   | Runs Next.js pages and server routes over HTTPS               | Yes for the requested hosting workflow            | Hobby is personal/non-commercial; paid plans support broader usage      | Vercel login and GitHub installation authorization                             |
-| SMTP/email provider      | Delivers verification and password-reset emails to real users | Yes for a public signup service                   | Provider-dependent; Resend example below has free and paid tiers        | SMTP host, port, username, password, sender identity; entered in Supabase      |
-| Cambridge Dictionary API | Displays official dictionary entries in the app               | Optional; ordinary external link works without it | Application-specific approval/agreement; fees and rights are negotiated | API development key, licensed dictionary code; license confirmation flags      |
+Each learning session includes discovery, meaning, context, synonym distinctions, typed recall, your own sentence, application and a confidence recap. Personal sentences are checked for the word's presence and self-assessed; the app does not send them to AI for grading. Review sessions use recall, context and confidence. Wrong answers bring a word back in ten minutes; successful reviews gradually increase the interval. Quick review covers up to five due words and full review up to thirty. You can also practice a learned word early.
 
-An email-sending domain may also be required by your chosen SMTP provider. The app itself can use Vercel’s supplied domain. There is **no** Google login requirement, analytics service, scheduled push backend, Redis, external font service, storage bucket or cron dependency. Notification permission testing uses the browser and does not require VAPID credentials.
+The wordbook supports notes, original context, tags, priority, favorites, search, filters, archiving and schedule reset. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
 
-Review current [Supabase plans](https://supabase.com/pricing), [OpenAI billing](https://help.openai.com/en/articles/9039756), [GitHub plans](https://github.com/pricing), [Vercel plans](https://vercel.com/pricing), and [Resend plans](https://resend.com/pricing). Supabase Free can pause after inactivity and does not include automatic backups; persistent storage is not a substitute for an operator backup plan.
+Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions rank the available catalog by usefulness, level and interests; they are not an unlimited AI recommendation feed. Twenty pre-written starter lessons provide initial material. Saved custom lessons expand a learner's available content.
 
-## Start locally
+Install the website on your Home Screen through your browser. Public assets and a reconnect page work offline; already loaded words remain readable while open. Account changes require a connection. Reminders appear inside the app; the notification control sends an immediate permission test, not scheduled background push. Device pronunciation uses the browser's voice, separate from optional Cambridge audio.
 
-1. Install **Node.js 24 LTS** with npm. Check `node --version` and `npm --version` in Terminal. This repository’s `.nvmrc` selects 24 if you already use nvm.
-2. Unzip the repository. Open the `lexiloop` folder: it must contain `package.json`, `app`, `components`, and `supabase`.
-3. In Terminal, type `cd `, drag that folder from Finder into Terminal, then press Return. Subsequent commands run inside that folder.
-4. Install exactly the locked dependencies:
+## How the pieces fit together
+
+```text
+Browser → Next.js pages and API routes on Vercel
+                    ├─ Supabase Auth: identity and email links
+                    ├─ Supabase PostgreSQL: words, profiles and practice data
+                    ├─ OpenAI: new lessons when no stored lesson exists
+                    └─ Cambridge: optional, separately licensed reference
+Supabase Auth → Gmail SMTP → verification and recovery emails
+```
+
+The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreSQL, the OpenAI SDK, Zod validation, Vitest and Playwright. Node 24 is the recommended runtime. Exact dependency versions come from `package-lock.json`.
+
+| Location                 | Responsibility                                                   |
+| ------------------------ | ---------------------------------------------------------------- |
+| `app/`                   | Pages, authenticated API routes and email callback               |
+| `components/`            | Learning interface, account forms and client state               |
+| `lib/domain.ts`          | Daily-set rules and commands that change learning state          |
+| `lib/spaced-repetition/` | Review scheduling                                                |
+| `lib/db/`                | Verified users, private reads and authorized database writes     |
+| `lib/ai/`                | Lesson schema, original-content prompt and provider              |
+| `lib/dictionary/`        | Separate optional Cambridge integration                          |
+| `data/catalog.ts`        | Twenty original starter lessons                                  |
+| `supabase/migrations/`   | Versioned SQL schema, policies and functions                     |
+| `scripts/`               | Database setup, configuration checks and isolated test launchers |
+| `tests/`                 | Unit, route, embedded database and browser tests                 |
+| `public/`                | PWA icons, service worker and offline page                       |
+
+Normal reads load the whole personal collection in pages of database results, but only the latest 31 daily sets and 100 review events. PostgreSQL computes lifetime totals without transferring the entire history. Settings offers a JSON export containing all personal history; this is a download, not a database backup or an import feature.
+
+Changes are validated on the server and committed together in a database transaction. A profile revision detects another tab changing the same account. Repeated completion requests are recognized by their event ID so a retry does not award progress twice. See [architecture](docs/architecture.md) and [review scheduling](docs/spaced-repetition.md) for implementation details.
+
+## Install and run locally
+
+### 1. Install Git and Node.js
+
+Git downloads and tracks the repository. Install it from [Git's official download page](https://git-scm.com/downloads), then verify `git --version`. On macOS, running Git may prompt you to install Apple's command-line developer tools.
+
+Node.js is the JavaScript runtime that runs the development server, builds, tests and setup scripts. npm, included with Node, installs dependencies and runs the commands in `package.json`.
+
+**macOS:** use [nvm's official installation instructions](https://github.com/nvm-sh/nvm#installing-and-updating). Run the installation command from that page in Terminal, then open a new terminal so your shell loads nvm. Confirm it is available with `command -v nvm`. Avoid installer commands from unrelated websites.
+
+```bash
+nvm install 24
+node --version
+npm --version
+```
+
+**Windows:** download the Node.js **24** Windows installer from [nodejs.org](https://nodejs.org/en/download), choose your machine's architecture, and keep npm and PATH integration enabled. Open a new PowerShell window after installation:
+
+```powershell
+node --version
+npm --version
+git --version
+```
+
+Expect Node `v24.x.x`; patch versions can differ. nvm-sh is intended for POSIX shells, not native PowerShell. The official Node installer is sufficient on Windows; a separate version manager is optional.
+
+### 2. Clone the existing repository
+
+Choose any folder you like. For example, from your Documents folder:
+
+```bash
+git clone https://github.com/alinikan/LexiLoop.git
+cd LexiLoop
+```
+
+All following commands run inside this folder, beside `package.json`. Do not initialize another repository. If you already have this checkout, use it instead of cloning over it.
+
+On macOS with nvm:
+
+```bash
+nvm use
+```
+
+This reads `.nvmrc` and selects Node 24 for the current terminal. Run it after opening a new terminal or entering the project when another Node version is active. You do not need to run it before every npm command. Optionally, `nvm alias default 24` makes Node 24 the default in new shells.
+
+### 3. Install the locked dependencies
 
 ```bash
 npm ci
 ```
 
-For a **development-only device demo**, run `npm run dev:demo`, then open the local URL printed by Next.js. This has no accounts, no paid API calls, and only the editorial starter words. Demo data does not transfer into a real account. Stop the server with Control-C.
+`npm ci` installs the dependency versions recorded in `package-lock.json`, replacing an existing `node_modules` directory. Use it for reproducible clean installs and CI. `npm install` is normally used when deliberately adding or updating a dependency and its lockfile. Never transfer `node_modules` between project copies or computers; it is generated output.
 
-For real accounts, create a local environment file **only if you do not already have one**:
+### 4. Create local configuration
+
+If `.env.local` already exists, edit it without overwriting its credentials. Otherwise copy the template:
+
+macOS:
 
 ```bash
 cp -n .env.example .env.local
 ```
 
-Open `.env.local` in your code editor. It belongs beside `package.json`, not inside `app`. Keep the exact variable names. Do not put keys into source files, this README, a chat, or a Git commit. Leave the local app URL as `http://localhost:3000` and configure the services below. Restart the local server after changing environment values.
+Windows PowerShell:
 
-# Supabase Setup — Complete Beginner Guide
-
-## Create the project
-
-1. Open the [Supabase dashboard](https://supabase.com/dashboard), create an account or sign in, and verify your account email if requested. Your dashboard login is separate from the learner accounts you will create inside LexiLoop.
-2. Create/select your organization, then choose **New project**. Use a name such as `lexiloop-production` so you can distinguish it from future experiments.
-3. Generate a strong **Database Password** and save it in your password manager. This is neither your dashboard password nor a learner password.
-4. Choose a region close to your intended users and, where practical, your Vercel server region. Confirm the plan shown before creating anything paid.
-5. Choose **Create new project** and wait until provisioning finishes and the project dashboard opens. See the official [Supabase/Vercel setup](https://supabase.com/partners/vercel).
-
-## Get the three application values
-
-Open your project’s **Connect** dialog to find its project URL and publishable key. For individual keys, use **Settings → API Keys**. Create publishable/secret keys there if the project has none. Current Supabase terminology is **publishable key** (`sb_publishable_…`) and **secret key** (`sb_secret_…`); this code uses those names. See [API keys](https://supabase.com/docs/guides/getting-started/api-keys).
-
-Copy these separately into `.env.local`:
-
-```dotenv
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
-SUPABASE_SECRET_KEY=YOUR_SECRET_KEY
+```powershell
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
 ```
 
-The URL and publishable key identify the project and can reach the browser. The secret key bypasses database RLS and **must remain server-only**. This application uses it only after verifying the signed-in user. Do not put it in a variable starting with `NEXT_PUBLIC_`. If upgrading the previous build, replace its old `SUPABASE_SERVICE_ROLE_KEY` variable with `SUPABASE_SECRET_KEY`; do not keep obsolete names as a second source of configuration.
+Open `.env.local` in your editor. Keep exactly one entry per variable. Use the service instructions below to fill in your own values. This file is ignored by Git and must stay private.
 
-## Get a database connection string
+### 5. Start the app
 
-In **Connect**, choose the PostgreSQL connection string. For local migrations, use the direct connection if your network supports its address family, or **Session pooler** for an IPv4-only network. Copy the host and username exactly; do not infer them from the region. Replace the password placeholder with the saved database password. URL-encode reserved password characters when embedding them in a connection URL. Save the complete string as `DATABASE_URL` in `.env.local`. Use the connection’s TLS settings; do not disable certificate validation to bypass an error. See [connecting to PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres).
+After configuring Supabase, migrations, email and OpenAI:
 
-`DATABASE_URL` is used by the setup scripts on your computer. It is **not needed in Vercel**. Runtime requests use Supabase’s HTTPS API.
+```bash
+npm run dev
+```
 
-## Create tables and load starter words
+Open [http://localhost:3000](http://localhost:3000). Stop the server with Ctrl+C. Restart after editing `.env.local`.
 
-Run:
+For a quick interface preview before configuring services:
+
+```bash
+npm run dev:demo
+```
+
+This explicitly enables a local **demo mode**: no real accounts, no paid AI calls, and only the twenty starter lessons. Practice is stored in this browser's local storage and does not transfer to a real account. A **mock provider** means a local stand-in that returns starter content instead of contacting OpenAI. Production builds disable both demo mode and mock generation so a deployed account app cannot accidentally save users' progress only on their device.
+
+## Environment variables
+
+Public variables beginning with `NEXT_PUBLIC_` may appear in browser JavaScript. All other variables below are server/tool configuration. “Server config” describes a non-secret setting, not permission to expose secret keys alongside it.
+
+| Variable                               | Local `.env.local`           | Vercel Production                 | Visibility and purpose                               |
+| -------------------------------------- | ---------------------------- | --------------------------------- | ---------------------------------------------------- |
+| `NEXT_PUBLIC_DEMO_MODE`                | `false`                      | `false`                           | Public; local demo switch, ignored in production     |
+| `MOCK_AI`                              | `false`                      | `false`                           | Server config; mock selection guard                  |
+| `AI_PROVIDER`                          | `openai`                     | `openai`                          | Server config; provider choice                       |
+| `NEXT_PUBLIC_APP_URL`                  | `http://localhost:3000`      | `https://lexiloop-ali.vercel.app` | Public; base app origin for auth and request checks  |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Your project URL             | Same project URL                  | Public; Supabase HTTPS endpoint                      |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Your publishable key         | Same key                          | Browser-safe project key; permissions still enforced |
+| `SUPABASE_SECRET_KEY`                  | Your server secret           | Same secret                       | **Secret**; privileged server database operations    |
+| `DATABASE_URL`                         | Required for migrations/seed | **Not needed**                    | **Secret**; PostgreSQL setup connection              |
+| `OPENAI_API_KEY`                       | Your project API key         | Your project API key              | **Secret**; server-side AI access                    |
+| `OPENAI_MODEL`                         | `gpt-5.6-terra`              | `gpt-5.6-terra`                   | Server config; same fallback if unset                |
+| `CAMBRIDGE_API_KEY`                    | Optional; empty              | Optional; omit                    | **Secret**; licensed API access                      |
+| `CAMBRIDGE_DICTIONARY_CODE`            | Optional; empty              | Optional; omit                    | Server config; licensed dataset                      |
+| `CAMBRIDGE_LICENSE_CONFIRMED`          | `false`                      | `false`                           | Server config; explicit license gate                 |
+| `CAMBRIDGE_AUDIO_LICENSE_CONFIRMED`    | `false`                      | `false`                           | Server config; separate audio-rights gate            |
+
+The current deployment uses Supabase project `https://zpmutfqbklrvwwzizkuv.supabase.co`. That URL is public configuration, not a credential. Maintainers use that project's keys privately; a separate installation should create its own project and use its own values. The template intentionally contains no actual keys or database passwords.
+
+The application consistently uses `SUPABASE_SECRET_KEY`. It is never browser-prefixed. Gmail's App Password belongs in **Supabase SMTP settings**, not `.env.local` or Vercel.
+
+## Supabase database and authentication
+
+### Select the project and retrieve keys
+
+For the existing deployment, select its existing project in the [Supabase dashboard](https://supabase.com/dashboard). For a separate installation, create a project, choose a region and save its database password in a password manager. Your dashboard login is separate from learner accounts inside LexiLoop.
+
+Use the project's Connect dialog or Settings → API Keys to obtain its URL, publishable key and server secret. Supabase's modern keys use `sb_publishable_…` and `sb_secret_…` prefixes. Copy them to their corresponding environment entries. Dashboard labels can change; see [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-keys).
+
+### Connect for migrations
+
+Get the PostgreSQL connection string from the project's Connect dialog. A direct connection has this shape:
+
+```text
+postgresql://postgres:<DATABASE_PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres
+```
+
+The password is the **database password**, not a Supabase account password, API key, or learner password. Encode reserved characters in a password when placing it inside a URL. Put the completed connection string in `DATABASE_URL` locally.
+
+Direct connections can require IPv6 connectivity. If your network cannot connect, select **Session pooler** and copy the exact host, username and connection settings Supabase supplies. Do not invent a pooler hostname or turn off certificate validation to bypass TLS errors. See [PostgreSQL connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+### Apply migrations and seed starter lessons
 
 ```bash
 npm run db:migrate
 npm run db:seed
 ```
 
-The first command applies every unapplied SQL file in filename order. It holds a migration lock and commits each migration with its ledger entry. The second inserts 20 original starter lessons and is safe to repeat. Do not manually recreate tables in the Table Editor.
+A **migration** is a versioned SQL file that creates or changes database structures. The runner holds a database lock so two migration processes do not apply the same file simultaneously. It records completed files in `public.lexiloop_migrations`, the **migration ledger**. Each file and its ledger entry commit together, or both roll back on failure. Re-running skips recorded files.
 
-A new database needs both `001_initial.sql` and `002_production.sql`. An existing installation that already applied 001 needs 002. Do not edit an already-applied migration in a live project; use a new forward migration for future changes. If you previously ran SQL manually without the migration runner, check which schema changes actually exist before using the runner: its ledger cannot infer manually applied files.
+The current files are `001_initial.sql` and `002_production.sql`. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
 
-In **Table Editor**, you should see `profiles`, `words`, `word_meanings`, `word_examples`, `user_words`, `daily_word_sets`, `daily_word_set_items`, `review_events`, `suggestion_feedback`, quotas, aliases and generation leases. `words` should contain 20 rows after the seed. Private tables remain empty until you use the app.
+The seed inserts exactly **20 original starter lessons** in a fresh database, with **20 meaning rows and 40 example rows**. It is safe to repeat: existing canonical lessons are preserved. A used database can contain more than twenty words because generated lessons are stored there too.
 
-For a read-only check in **SQL Editor**, run:
+Tables include profiles, shared words/meanings/examples, private saved words, daily sets and their items, review events, suggestion feedback, generation and dictionary quotas, aliases, generation leases and the migration ledger. New Auth users get a profile automatically through a database trigger. Older accounts without a profile receive one on their first successful state write.
+
+Run these read-only checks in Supabase SQL Editor:
 
 ```sql
 select name from public.lexiloop_migrations order by name;
-select count(*) as starter_words from public.words;
-select tablename, rowsecurity from pg_tables
-where schemaname = 'public' order by tablename;
+select count(*) as stored_lessons from public.words;
+select count(*) as meaning_rows from public.word_meanings;
+select count(*) as example_rows from public.word_examples;
+select schemaname, tablename, rowsecurity
+from pg_tables where schemaname = 'public' order by tablename;
+
+select schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+from pg_policies where schemaname = 'public'
+order by tablename, policyname;
 ```
 
-The migration ledger should list both files. All app tables should have RLS enabled. Owner-only SELECT policies protect private records; ordinary clients have no mutation policies. Server-only RPCs make authorized changes. Shared original lexical content is readable by authenticated users. SQL Editor normally runs with elevated privileges, so seeing all users there is **not** a test of client access. See [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+The ledger should list both migrations. All LexiLoop tables, including the ledger, should have row security enabled.
 
-## Enable email/password accounts
+### Understand Row Level Security
 
-Open **Authentication → Sign In / Providers** (the Email provider section), enable Email and keep **Confirm email** enabled. Google/Apple providers are unnecessary. Set a minimum password length of at least 12; the app applies that minimum to signup and new passwords while still allowing existing shorter passwords at sign-in.
+**Row Level Security (RLS)** applies database rules to individual rows. Being signed in does not give a learner access to every profile or wordbook. Policies allow authenticated users to read their own private records. Shared lesson definitions can be read by all authenticated learners, while notes, sentences, settings and review history remain private.
 
-Open **Authentication → URL Configuration**. For local testing, set **Site URL** to `http://localhost:3000`. Add these exact allowed redirect URLs:
+Browser clients cannot directly write app tables or invoke privileged write functions. The Next.js server verifies the Supabase user, validates the command, applies learning rules, then calls the required database function. Identity comes from the verified session, never a browser-submitted user ID.
+
+The server secret can bypass RLS, which is why it must remain server-only and cannot replace authorization checks. SQL Editor normally runs with elevated privileges: seeing all rows there does not test learner isolation. See [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+
+### Configure email/password authentication and URLs
+
+Enable the Email/password provider and **Confirm email** in Authentication. Configure a minimum password length of at least twelve characters; the app enforces this for signup and password changes. Existing shorter passwords remain accepted at sign-in. No Google login provider is required.
+
+For the existing production project, set **Site URL** to:
 
 ```text
+https://lexiloop-ali.vercel.app
+```
+
+Keep these allowed redirects for production and local development:
+
+```text
+https://lexiloop-ali.vercel.app/auth/confirm
+https://lexiloop-ali.vercel.app/auth/confirm?next=/reset-password
+https://lexiloop-ali.vercel.app/reset-password
 http://localhost:3000/auth/confirm
 http://localhost:3000/auth/confirm?next=/reset-password
 http://localhost:3000/reset-password
 ```
 
-Use one hostname consistently: `localhost` and `127.0.0.1` are different browser origins. If you intentionally run a different port, update both the app URL and the allowed URLs. The [password-auth guide](https://supabase.com/docs/guides/auth/passwords) explains the signup and reset lifecycle; [redirect configuration](https://supabase.com/docs/guides/auth/redirect-urls) explains the allowlist.
+A separate local-only Supabase project can use `http://localhost:3000` as its Site URL. Site URL is project-wide, while redirect URLs are an allowlist. Keep local `NEXT_PUBLIC_APP_URL` pointing to localhost even when sharing the production project.
 
-## Set up real email delivery
+`/login` is an app page, not the base origin or a Supabase callback. An unauthenticated visit to `/` redirects there, but neither Site URL nor `NEXT_PUBLIC_APP_URL` should end in `/login`. Use a consistent hostname and port; `localhost` and `127.0.0.1` are different origins. See [redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
 
-Supabase’s default SMTP is for limited testing: it restricts recipients to project-team addresses and has a low sending limit. Public signup and recovery need **custom SMTP**. See [Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
+## Gmail SMTP and email templates
 
-Use an SMTP provider you already have, or follow the Resend example in the next section. Enter its sender address/name, host, port, username and password in **Authentication → Email → SMTP Settings** (Email is under Notifications in the documented dashboard). Save, and check Authentication’s email rate limits against your intended usage. SMTP credentials belong in Supabase, not in the app’s Vercel environment.
+### Gmail for this private deployment
 
-## Email templates for server-side confirmation
+SMTP is how Supabase delivers email. For this one-to-two-person deployment, use a dedicated Gmail address:
 
-After custom SMTP is configured, open Authentication’s **Email Templates**. Keep the surrounding email copy, but set the action link in **Confirm sign up** to:
+1. Sign into its Google account and enable **2-Step Verification** under Security.
+2. Create an **App Password** for LexiLoop using [Google's App Password instructions](https://support.google.com/accounts/answer/185833). Use that generated password, not your normal Google password. Some managed accounts or security configurations do not offer App Passwords; use an eligible account or a transactional provider in that case.
+3. In Supabase Authentication's email/SMTP settings, enable custom SMTP and enter:
+
+| SMTP setting | Value                   |
+| ------------ | ----------------------- |
+| Host         | `smtp.gmail.com`        |
+| Port         | `465` (SSL/TLS)         |
+| Username     | Dedicated Gmail address |
+| Password     | Google App Password     |
+| Sender name  | `LexiLoop`              |
+| Sender email | The same Gmail address  |
+
+4. Save and check signup and recovery delivery. Check spam and Supabase Auth logs if an email fails.
+
+These SMTP credentials stay in Supabase. The app sends authentication requests to Supabase; it does not connect to Gmail itself. No Gmail password or SMTP configuration is needed in Vercel.
+
+Supabase warns that personal mail providers have delivery and rate limitations. That is a reasonable tradeoff for this private use case, not a promise of reliable public bulk delivery. For a larger public deployment, switch to a transactional provider such as Resend and follow its domain-verification requirements. Buying a domain is not required for the current Gmail/Vercel setup. Supabase's built-in test sender has recipient restrictions and is not a replacement for configured SMTP. See [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
+
+### Templates control the links
+
+SMTP delivers the message; the template sets its content and destination. In Supabase Email Templates, use these subjects and links.
+
+**Confirm signup — subject:** `Confirm your LexiLoop account`
 
 ```html
-<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email"
-  >Confirm your LexiLoop email</a
->
+<h2>Welcome to LexiLoop</h2>
+<p>Confirm your email address to finish creating your account.</p>
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm email</a></p>
+<p>If you did not create this account, you can ignore this email.</p>
 ```
 
-Set the action link in **Reset password** to:
+**Password reset — subject:** `Reset your LexiLoop password`
 
 ```html
-<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password"
-  >Reset your LexiLoop password</a
->
+<h2>Reset your LexiLoop password</h2>
+<p>We received a request to reset your password.</p>
+<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Reset password</a></p>
+<p>If you did not request a password reset, you can ignore this email.</p>
 ```
 
-Leave the template placeholders exactly as shown; Supabase substitutes them. The callback verifies the token server-side and creates HttpOnly cookies. It also supports the PKCE `code` flow used by default templates, but token-hash templates are preferable when opening the email on another device. Keep your Site URL accurate. Disable email-provider click tracking for these authentication links. See [email templates](https://supabase.com/docs/guides/auth/auth-email-templates) and [SSR cookies](https://supabase.com/docs/guides/auth/server-side/creating-a-client).
+Keep Supabase's template placeholders intact. These templates match the app's actual destinations: signup supplies `/auth/confirm`, and recovery supplies `/auth/confirm?next=/reset-password`. They use **RedirectTo** so a request started locally can return locally even when the project's Site URL is production. The `?` in the signup link and `&` in the reset link are deliberate.
 
-If template editing is unavailable, confirm that custom SMTP is saved and check your current plan’s dashboard restrictions. Do not substitute a fake confirmation page.
+A template using `{{ .SiteURL }}/auth/confirm?...` also works, but always returns to that project-wide Site URL. For the current shared project, that means production even if you requested the message locally. Use the templates above for environment-specific return URLs. They are intended for this app's signup/recovery requests, not arbitrary dashboard invitation flows. See [template variables](https://supabase.com/docs/guides/auth/auth-email-templates).
 
-## Verify Supabase locally
+The `/auth/confirm` route verifies the token hash server-side, creates authentication cookies, and sends recovery links to `/reset-password`. Other confirmation links return to `/`. It also accepts the Supabase authorization-code flow; that flow can require the initiating browser's code-verifier cookie. Invalid or expired links go to `/login?confirmation=failed` without copying tokens into the error message. Only the internal reset destination is accepted from `next`.
 
-Start `npm run dev`. Create an account with a real email you control, open the verification email, then sign in. Set a display name and save a word. Reload, sign out, and sign back in: the same private data should return. Check the account in Authentication → Users and its matching UUID in `profiles`/`user_words`.
+## OpenAI setup and generation
 
-If signup email does not arrive: check spam, SMTP sender verification, provider delivery logs, Supabase Auth logs and email rate limits. If a link points to the wrong place: check `NEXT_PUBLIC_APP_URL`, Site URL, allowed redirects, the template and whether you restarted/redeployed. If the app says storage or summaries are unavailable: verify all migrations and that the project is not paused. A publishable key is not a replacement for the server secret key.
+Create or select a project on the [OpenAI API platform](https://platform.openai.com), generate a private API key, and configure API billing separately from ChatGPT. A ChatGPT Plus subscription does not fund this application's API requests. Choose the key's lifetime according to your operational needs and keep it revocable.
 
-# SMTP Setup — Resend Example
-
-Resend is an example you may choose, not an additional mandatory vendor if you already have working SMTP.
-
-1. Create an account at [Resend](https://resend.com). Open **Domains → Add domain** and enter a domain or sending subdomain you control, such as `mail.yourdomain.com`.
-2. Resend supplies DNS verification records. Add those exact records at the DNS provider for that domain, then use Resend’s verification control and wait for a verified result. Owning a Vercel subdomain does not give you DNS control over `vercel.app`.
-3. Open **API Keys → Create API Key**. Name it for LexiLoop email, restrict it to sending and the verified domain where available, and save the shown secret in your password manager.
-4. In Supabase SMTP Settings, set host `smtp.resend.com`, port `465`, username `resend`, and password to that Resend key. Use a sender on the verified domain and a recognizable name such as `LexiLoop`.
-5. Save and test signup and recovery from the app. Check Resend’s delivery logs when diagnosing an email failure. No Vercel redeploy is needed merely to change Supabase SMTP settings.
-
-Follow [Resend’s Supabase SMTP guide](https://resend.com/docs/send-with-supabase-smtp) and [domain verification guide](https://resend.com/docs/dashboard/domains/introduction). A common mistake is using the testing sender for arbitrary public recipients or copying the key into the app instead of Supabase. Check the current free-tier/day limits before inviting users.
-
-# OpenAI Setup
-
-1. Open the [OpenAI API platform](https://platform.openai.com) and sign in/create an account. A ChatGPT subscription and API billing are separate.
-2. In platform settings, choose your organization and a project for LexiLoop; create a project if you do not have one. Keep development and production billing/keys separate if you operate both.
-3. Open the project’s **API keys** page, choose **Create new secret key**, give it an identifying name, and permit Responses API requests for the selected model. Copy the secret when it is shown and store it securely.
-4. Open **Billing** from the platform settings and complete any required payment/credit setup. Check project limits and usage notifications. An API key existing does not prove the account can make paid calls.
-5. Set these values in `.env.local`, and later in Vercel’s Production environment:
+Set these server variables locally and in Vercel:
 
 ```dotenv
-NEXT_PUBLIC_DEMO_MODE=false
-MOCK_AI=false
+OPENAI_API_KEY=YOUR_PRIVATE_PROJECT_KEY
+OPENAI_MODEL=gpt-5.6-terra
 AI_PROVIDER=openai
-OPENAI_API_KEY=YOUR_PRIVATE_OPENAI_KEY
-OPENAI_MODEL=gpt-4.1-mini
+MOCK_AI=false
 ```
 
-The configured model must be available to your project and support structured outputs. The app uses the official SDK’s Responses API with `store:false`; it sends only the normalized word, not your notes or sentences. See [API setup](https://developers.openai.com/api/docs/quickstart), [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), and [billing separation](https://help.openai.com/en/articles/9039756).
+The chosen model must be enabled for your API project. The [GPT-5.6 Terra model page](https://developers.openai.com/api/docs/models/gpt-5.6-terra) documents Responses API and structured-output support. A valid-looking model setting does not prove your project has access or available credits.
 
-6. Restart locally, or redeploy on Vercel. Sign in and build a word outside the starter catalog, for example `meticulous`. Inspect its card, save it, reload, and confirm it remains in My words. Check `words` and `word_aliases` in Supabase. Request the same normalized word again: it should reuse canonical content instead of billing another generation.
-7. Confirm activity in your OpenAI project’s Usage page. If it fails, check model access, billing, the exact key, Vercel environment scope, and deployment logs. Do not enable mocks to hide a provider error.
+The provider sends only the requested word plus the lesson instructions. It uses the Responses API, `store: false`, a 35-second timeout per request and no SDK automatic retries. Zod validates the returned structure, and additional checks verify answer indices and all four exercise categories. Invalid lesson output gets one second attempt. Credentials, billing, permissions, rate limits, unavailable models and network failures do not get retried as malformed content.
 
-The app allows 20 new generation attempts per account per UTC day. Failed generation attempts count; the bounded validation retry belongs to the same attempt. Cache hits do not consume the quota. Concurrent requests for the same input use a 90-second database lease. Quotas are per account, so use sensible signup controls and provider spending alerts for a public app. AI validation checks structure and exercise integrity, not a guarantee of linguistic truth.
+Lessons include meanings and examples, a scenario, usage/register guidance, common mistakes, synonym distinctions, antonyms, word family, collocations, patterns, a memory association and exercises. Schema validation checks completeness, not factual truth; review generated content before saving it. See [generation details](docs/ai-content.md) and [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
 
-# Cambridge Dictionary Setup
+### Stored lessons reduce repeated cost
 
-## Access and approval
+A **cached lesson** is a lesson already stored in the shared `words` table. Starter words and stored lessons can be reused without another OpenAI call. An **alias** links an input form to its canonical word when the model normalizes it. Your notes and practice sentences remain separate, private data.
 
-1. Begin at the [Cambridge developer resources](https://dictionary.cambridge.org/develop.html), then the [API developer hub](https://dictionary-api.cambridge.org/). Read its [terms](https://dictionary-api.cambridge.org/api/terms-and-conditions), [FAQ](https://dictionary-api.cambridge.org/api/faq), and [specification](https://dictionary-api.cambridge.org/api/specification).
-2. Use [Registration](https://dictionary-api.cambridge.org/registration). Supply your name, username, password, email, organization/contact details and intended use honestly. If you are an individual and a field is unclear, ask Cambridge how to complete it rather than inventing an organization.
-3. Evaluation access is not public-app permission. The published terms describe a limited evaluation allowance of 3,000 calls over 30 days. For an application, use **Apply** / the [licensing query page](https://dictionary-api.cambridge.org/apply) to request an application-specific development key and agreement. Approval, permitted use and price require Cambridge’s decision; do not assume an instant free production key.
-4. Describe this project, for example: “A mobile web vocabulary-learning app with individual email/password accounts. Users request a Cambridge reference beside independently generated learning exercises. We would display unmodified entries and attribution on demand, without storing entries, redistributing a dictionary dataset, or sending dictionary content to AI. Please confirm permitted dictionary datasets, audio playback, traffic limits, attribution/branding and public deployment rights.”
-5. Follow Cambridge’s account instructions for evaluation access and its licensing correspondence for the application key. The public pages do not establish a guaranteed dashboard location or delivery time for your eventual licensed key. Ask the licensing contact if the key has not been supplied; never copy a sample key from a tutorial.
+If two requests ask for the same uncached input nearly simultaneously, the database gives one a temporary **generation lease** lasting ninety seconds. The other receives a “being prepared” response and can retry later to reuse the stored result. The lease owner rechecks the cache before spending quota. Different input spellings can still generate separately before their relationship is known; this is not a guarantee against every possible duplicate cost.
 
-## Configure the licensed integration
+The database allows **20 new generation attempts per account per UTC day**. Failed attempts count; a validation retry belongs to the same allowance but can still incur a second API charge. Cache hits do not consume this allowance. This application quota is separate from OpenAI's billing and request-rate limits.
 
-Leave all Cambridge values blank/false while approval is pending. The normal lesson and external dictionary link work immediately.
+### Provider failures and budget
 
-When Cambridge grants the rights you need, obtain the **dictionary code** for your licensed English dataset through its API **Demo → getDictionaries** or the official getDictionaries request. Copy the returned `dictionaryCode`; a dictionary’s display name is not its code. Configure:
+Learners receive a stable message when AI is unavailable; saved lessons remain usable. Server logs include `lexiloop.ai.unavailable` with a fixed category such as `billing_quota`, `rate_limit`, `authentication`, `permission`, `model_unavailable`, `timeout` or `network`. They do not include keys, upstream error bodies, account balances or vocabulary input.
 
-```dotenv
-CAMBRIDGE_API_KEY=YOUR_APPLICATION_SPECIFIC_KEY
-CAMBRIDGE_DICTIONARY_CODE=YOUR_LICENSED_DICTIONARY_CODE
-CAMBRIDGE_LICENSE_CONFIRMED=true
-CAMBRIDGE_AUDIO_LICENSE_CONFIRMED=false
-```
+An SDK `insufficient_quota` code/type is treated as billing quota; other HTTP 429 errors are treated as rate limits. Unknown provider errors remain generic rather than guessed from message text. See [OpenAI error guidance](https://developers.openai.com/api/docs/guides/error-codes).
 
-`CAMBRIDGE_API_KEY` is the exact variable this repository uses. The server sends it as the API’s `accessKey` request header; it never goes to browser JavaScript. `CAMBRIDGE_LICENSE_CONFIRMED` is this app’s operator switch, not a Cambridge credential or proof of rights. Enable audio separately only when the agreement permits it.
+Costs depend on model, input/output tokens and new lessons requested. Prepaid funding amounts and automatic reload are owner choices, not app requirements. Review current [API pricing](https://developers.openai.com/api/docs/pricing) and your project's usage/billing settings. Do not assume an application quota is a monetary spending cap.
 
-Put these in `.env.local` locally and **Vercel → Project → Settings → Environment Variables → Production** for the deployed app. Restart/redeploy. Open a saved word’s detail and press **Look up in Cambridge**. The dedicated section should show the full first matching official entry, with its canonical source link. Part of speech, senses, labels, examples and IPA appear as supplied; missing fields are not fabricated. Other entries remain accessible through Cambridge’s website. If licensed audio is enabled and returned, British/American playback controls appear.
+## Optional Cambridge reference
 
-Use the Cambridge API Demo to diagnose dataset/key permissions. An invalid key, unavailable dataset, no result, rate limit, malformed response or network failure produces a small fallback message without discarding the lesson. Audio failure does not hide a valid definition. The app limits lookups to 100 per account per UTC day; an audio-enabled lookup can make an additional upstream request. Your agreement can require a lower limit—adjust the quota migration before launch if needed.
+Keep all Cambridge fields empty/false unless you have approved API access and the required license. The current app works without it and shows an external Cambridge link on word cards. It does not scrape dictionary pages.
 
-## Storage, attribution and boundaries
+To enable it later, obtain an application-specific API key and dictionary code through [Cambridge's developer service](https://dictionary-api.cambridge.org/), review the agreement, and then configure the key, code and `CAMBRIDGE_LICENSE_CONFIRMED=true`. Enable audio separately only if the agreement permits it.
 
-The published default terms restrict copying/caching content and require a separate development agreement. Your actual agreement controls public use, branding, links, audio and fees. Keep every supplied notice. This implementation renders unmodified entry HTML inside a script-disabled frame, adds attribution and links, and uses `no-store` requests/responses. It does not persist Cambridge text in Supabase, local storage, exports, service-worker caches or AI prompts. Native audio uses `preload="none"`. The developer resources list widgets, but no widget was embedded because its suitability/licensing was not established; a normal source link is the fallback.
+Lookups happen only after pressing the button. The first supplied entry is displayed separately in a script-disabled frame with attribution and a source link. Cambridge content is not saved in the wordbook database, browser local storage, exports, service-worker cache or AI prompts. Missing entries or audio leave the original lesson available. Registration alone does not establish production licensing rights.
 
-Review the rendered section against your signed agreement before enabling the license flag. If it requires specific additional wording or a logo, apply those requirements before public use. Do not remove notices, rewrite a definition as Cambridge’s, or turn on storage to reduce bills without explicit storage rights.
+## Vercel deployment
 
-# Environment Variables
+The existing chain is **GitHub → Vercel → the existing Supabase project**. Use the current Vercel project for `lexiloop-ali.vercel.app`; do not create another database through Marketplace/Storage merely because Vercel offers one.
 
-Set application variables in `.env.local` for local use. In Vercel use **Project → Settings → Environment Variables**, select the appropriate scope, save, then redeploy. `NEXT_PUBLIC_` values are built into browser assets; changing them always needs a new build.
+For a separate deployment, import your authorized GitHub repository into Vercel, choose Next.js, use Node 24 and keep the repository root as the root directory. Use `npm ci` for installation and `npm run build` for the build. This app needs server routes; it is not a static export.
 
-| Variable                               | Exact source/value                                                                | Public or secret        | Local                   | Vercel Production                       | Preview / Development                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------- | ----------------------- | ----------------------- | --------------------------------------- | ----------------------------------------------------- |
-| `NEXT_PUBLIC_APP_URL`                  | Your local origin; later the stable HTTPS Vercel/custom origin, no trailing slash | Public                  | `http://localhost:3000` | Final app origin                        | Exact isolated preview origin / local origin          |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase Connect → Project URL                                                    | Public                  | Required                | Required                                | Prefer separate test project                          |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Settings → API Keys → Publishable key                                    | Public                  | Required                | Required                                | Test project’s key                                    |
-| `SUPABASE_SECRET_KEY`                  | Same project → Secret key                                                         | **Secret, server only** | Required                | Required                                | Test project’s secret                                 |
-| `DATABASE_URL`                         | Supabase Connect → PostgreSQL direct/session connection string                    | **Secret**              | Migration/seed only     | Omit                                    | Omit unless explicitly running setup in controlled CI |
-| `OPENAI_API_KEY`                       | OpenAI project → API keys                                                         | **Secret, server only** | Real generation         | Required for custom generation          | Separate restricted test key if needed                |
-| `OPENAI_MODEL`                         | Model available to that project                                                   | Server configuration    | `gpt-4.1-mini`          | `gpt-4.1-mini` or your supported choice | Same supported choice                                 |
-| `AI_PROVIDER`                          | Literal `openai`                                                                  | Server configuration    | `openai`                | `openai`                                | `openai`                                              |
-| `MOCK_AI`                              | Literal `false`                                                                   | Server configuration    | `false` for accounts    | `false`                                 | `false` in deployed previews                          |
-| `NEXT_PUBLIC_DEMO_MODE`                | Literal `false`                                                                   | Public                  | `false` for accounts    | `false`                                 | `false` in deployed previews                          |
-| `CAMBRIDGE_API_KEY`                    | Cambridge application licensing process                                           | **Secret, server only** | Optional                | Optional                                | Only if license covers it                             |
-| `CAMBRIDGE_DICTIONARY_CODE`            | Licensed dataset’s getDictionaries result                                         | Server configuration    | Optional                | Optional                                | Licensed dataset                                      |
-| `CAMBRIDGE_LICENSE_CONFIRMED`          | `true` only after approval; otherwise `false`                                     | Server configuration    | `false` by default      | `false` until approved                  | Same rights check                                     |
-| `CAMBRIDGE_AUDIO_LICENSE_CONFIRMED`    | `true` only for approved audio playback                                           | Server configuration    | `false` by default      | `false` until permitted                 | Same rights check                                     |
+1. Add the Vercel Production variables from the environment table. The app origin is `https://lexiloop-ali.vercel.app` for the existing deployment.
+2. Mark public `NEXT_PUBLIC_*` values as configuration when Vercel prompts. Exposing the website URL, Supabase project URL and publishable key is intentional. Keep `SUPABASE_SECRET_KEY` and `OPENAI_API_KEY` private.
+3. Leave `DATABASE_URL` out of the Vercel runtime. Apply migrations from your local setup before code depending on them is deployed.
+4. Deploy the intended Git branch. Changes to Vercel environment values require a **new deployment**. Public variables are incorporated into browser code during the build.
+5. Confirm Supabase's production Site URL, redirect allowlist, SMTP and templates, then follow the runtime checklist below.
 
-Vercel sets `NODE_ENV`; do not create your own Vercel override. The optional test-run variables are `E2E_BASE_URL`, `E2E_SCREENSHOTS`, `E2E_AUTH_UI`, `E2E_EMAIL` and `E2E_PASSWORD`. `E2E_AUTH_UI=true` enables the separate account-form fixture suite against an account-mode build. The email/password values are disposable test-account credentials, never application configuration or committed files. SMTP values are stored inside Supabase, so no unused SMTP variables appear here. Read [Vercel environment variables](https://vercel.com/docs/environment-variables).
+A supplied `vercel.app` domain is sufficient. A custom domain is optional; changing domains later requires updating the app origin, Site URL, redirects and a new build. Preview deployments should use separate service configuration; do not give untrusted branches production secrets. See [Vercel environment variables](https://vercel.com/docs/environment-variables) and [Git deployments](https://vercel.com/docs/git).
 
-# Publishing This Project to GitHub
-
-## Create the GitHub repository in the website
-
-Create/sign into [GitHub](https://github.com). Choose **+ → New repository**, select your account as owner, name it `lexiloop`, and choose Private unless you intend to publish the source. Leave initialization options for README, .gitignore and license unchecked: this folder already includes them. Create the repository and keep its HTTPS remote URL handy. See [creating a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository).
-
-The delivered folder currently has no Git history or remote. If you already placed it inside a Git repository, inspect `git status`, `git rev-parse --show-toplevel`, and `git remote -v` first. **Do not initialize a second repository or replace a remote blindly.** Use that existing repository’s workflow.
-
-## Terminal workflow for this new folder
-
-Run these inside the `lexiloop` folder, only when it is not already a repository:
+### Check deployment configuration locally
 
 ```bash
-git init -b main
-git status
+npm run check:production
 ```
 
-Before staging, verify `.gitignore` contains `.env*` with only `.env.example` allowed, plus `node_modules/`, `.next/`, test reports and build metadata. Check:
+This reads `.env.local` with existing shell values taking precedence and validates deployment settings without printing credentials or calling providers. It intentionally rejects HTTP origins for public deployment. **HTTP localhost is correct for development**, so that rejection does not mean your local setup or deployed site is broken.
+
+To check the production origin while keeping local configuration unchanged, this works on macOS and PowerShell:
 
 ```bash
-git check-ignore .env.local node_modules .next
-git add .
-git diff --cached --stat
-git diff --cached --name-only
+npm run check:production -- --app-url https://lexiloop-ali.vercel.app
 ```
 
-Inspect the filenames before committing. They must not include `.env.local`, real keys, database exports, `node_modules`, `.next`, personal logs or test-account passwords. `.env.example` contains blank/example values and is intentionally included. If a sensitive file is staged, use `git restore --staged FILE_NAME` and fix the ignore rule; if a key was previously committed or shared, revoke it with its provider.
+The remaining values still come from your local file/shell; this does **not** inspect Vercel's saved environment. A passed check proves settings are present and structurally appropriate, not that credentials, SMTP, billing or runtime integrations work. Duplicate variable names and URLs ending in `/login` are rejected with guidance.
 
-Then:
+## Testing
 
-```bash
-git commit -m "Prepare LexiLoop for production"
-git remote add origin https://github.com/YOUR_USERNAME/lexiloop.git
-git push -u origin main
-```
-
-Replace `YOUR_USERNAME` with the actual owner from GitHub’s remote URL. Authenticate using GitHub’s supported credential flow, SSH, or GitHub CLI; your ordinary account password is not a Git HTTPS password. If Git asks for author identity, configure your own name/email locally with `git config user.name` and `git config user.email`, then retry the commit. See [adding local code to GitHub](https://docs.github.com/en/migrations/importing-source-code/using-the-command-line-to-import-source-code/adding-locally-hosted-code-to-github).
-
-Refresh GitHub. `package.json`, `app`, `.env.example` and the README should be at the repository root. If instead you see only a `lexiloop` folder, either move the contents to the root or select that subfolder as Vercel’s Root Directory.
-
-## Optional website upload
-
-Use the **clean source ZIP**, extract it into a new folder, and upload its contents through **Add file → Upload files**. Do not upload the ZIP as a single file. Include hidden configuration files; Finder’s Command-Shift-period reveals them. GitHub permits up to 100 files in one web upload, so this expanded repository may need multiple batches. Review the pending filenames and commit message, then commit/propose the upload. The terminal workflow is less error-prone for the complete project. See [uploading files](https://docs.github.com/en/repositories/working-with-files/managing-files/adding-a-file-to-a-repository).
-
-# Deploying to Vercel
-
-1. Create/sign into [Vercel](https://vercel.com) using the account you want to own the app. Choose a plan that covers your use; Hobby is for personal non-commercial projects.
-2. Choose **Add New → Project**, connect GitHub, and authorize access to the `lexiloop` repository. Select it and choose **Import**. If it is missing, check the GitHub installation’s repository access and your ownership permissions.
-3. Use a recognizable project name. Choose **Next.js** as the framework. Root Directory should be the folder containing `package.json`: normally the repository root.
-4. Use Node.js **24.x**, install command `npm ci`, build command `npm run build`, and the framework’s default output. Do not use static export; this app requires server routes and cookies.
-5. Enter the **Production** environment values from the table above. Omit `DATABASE_URL`. Leave Cambridge disabled unless approved. Use `AI_PROVIDER=openai`, `MOCK_AI=false`, `NEXT_PUBLIC_DEMO_MODE=false`.
-6. If Vercel has not yet assigned the stable domain, leave `NEXT_PUBLIC_APP_URL` unset for this first deployment. Email-link actions will fail clearly until the next section is completed. Do not invite users or test signup on this initial deployment.
-7. Choose **Deploy**, open the deployment’s build logs and wait for **Ready**. Copy the stable project domain shown in the project’s Domains/overview, rather than a temporary per-commit URL.
-
-Vercel’s Git integration builds future pushes to the production branch and creates branch previews. See [Git deployment](https://vercel.com/docs/git) and [GitHub integration](https://vercel.com/docs/git/vercel-for-github). Keep preview credentials isolated from real-user data. Avoid broad wildcard authentication redirects for untrusted preview branches.
-
-If a build fails, open the failed deployment’s build log and fix its first real error. Verify Node version, repository root, lockfile, migrations and environment scope. A successful build alone does not verify SMTP, database credentials or billing.
-
-# After Vercel Gives You Your URL
-
-Suppose Vercel assigns `https://your-project.vercel.app`. Replace that example with the actual origin everywhere below.
-
-1. In **Vercel → Project → Settings → Environment Variables**, set `NEXT_PUBLIC_APP_URL` to the stable origin, with HTTPS and no trailing slash. Save for Production.
-2. In **Supabase → Authentication → URL Configuration**, set Site URL to that same origin. Keep local redirect entries if you still need local testing. Add:
-
-```text
-https://your-project.vercel.app/auth/confirm
-https://your-project.vercel.app/auth/confirm?next=/reset-password
-https://your-project.vercel.app/reset-password
-```
-
-3. Verify the signup/reset templates still contain the placeholders shown earlier. Because these templates use Site URL, changing Site URL changes where new email links land. Use a separate Supabase project if you need local and production email destinations simultaneously.
-4. In Vercel’s **Deployments** tab, redeploy the current production deployment so the public app URL is rebuilt into the app. Wait for Ready, then open the stable URL again.
-5. Run `npm run check:production` in an environment containing the intended production values. It checks names, HTTPS origins and modes without printing secrets; it does not contact or authenticate the providers. Keep your normal local `.env.local` on localhost for local work.
-6. Perform the real-account checklist below before inviting others.
-
-A custom app domain is optional. If you add one under **Settings → Domains**, follow Vercel’s supplied DNS records, wait for HTTPS, choose one canonical origin, and repeat the app URL, Supabase URL/template and redeployment steps. See [adding a domain](https://vercel.com/docs/domains/working-with-domains/add-a-domain). Your email sender domain and your app domain may differ.
-
-# iPhone Installation
-
-Open the final HTTPS URL in **Safari** on your iPhone. Use **More → Share** (or the Share button in your Safari layout), then **Add to Home Screen**. Turn on **Open as Web App** if shown, keep the app name, and tap **Add**. If the option is lower in the share sheet, scroll down; use Edit Actions if it is missing. See [Apple’s installation guide](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios). Launch the new icon and sign in there; the installed app may require its own sign-in even if Safari is already signed in. Do not test installation using the computer’s `localhost` URL.
-
-Check the bottom navigation above the home indicator, form scrolling with the keyboard open, password-manager autofill, portrait/landscape, and the full daily ring. Public icons/assets are available offline; a cold offline launch shows reconnect guidance. Private account HTML and API responses are deliberately not cached. An already-open word can remain readable in memory, but offline writes are not reported as saved.
-
-## Reminders
-
-In Settings enable the in-app reminder and choose your time/timezone. The banner appears while the app is open or when you return after that time. **This version does not schedule background push notifications.** The permission button sends an immediate test where the browser supports it; it is not a scheduled reminder. No cron or push credentials are needed. For a guaranteed closed-app reminder, create an ordinary phone reminder to open LexiLoop.
-
-# Verification and Daily Use
-
-## Local commands
+Run the clean verification sequence from the repository root:
 
 ```bash
 npm ci
@@ -357,34 +407,115 @@ npm test
 npx playwright install chromium
 npm run test:e2e
 npm run build
-npm start
 ```
 
-Run tests with no competing dev server on the same folder/port, or set `E2E_BASE_URL` to the intended existing test server. Browser learning tests deliberately use the development demo to avoid creating paid content or modifying real accounts. They test the same reducer and UI; database and route tests separately verify PostgreSQL/RLS and server behavior. Production disables demo mode, so `npm start` requires configured services for actual learning. The [verification report](docs/verification.md) states exactly what was run and what still needs live credentials.
+On macOS with nvm, run `nvm use` first. On Linux CI, Playwright uses `npx playwright install --with-deps chromium` to install required system libraries too.
 
-## Real-account acceptance checklist
+`npm run verify` combines lint, TypeScript, unit/database tests and the production build. Browser tests remain an explicit command because they need Chromium installed.
 
-Use two separate browser profiles (or one normal and one private window), plus two real email addresses you control. Do not use your only admin email for destructive account tests.
+| Check       | What it exercises                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `lint`      | Source-code rules and common mistakes                                                                                 |
+| `typecheck` | TypeScript consistency without changing application output                                                            |
+| `test`      | Learning rules, auth routes, provider errors, configuration, cache/quota behavior and real SQL in embedded PostgreSQL |
+| `test:e2e`  | Learning/demo journeys followed by account forms and real auth routes against a local Auth fixture                    |
+| `build`     | Optimized Next.js production compilation                                                                              |
 
-1. **Account A:** create an account, check confirmation-sent feedback, confirm email and sign in. Check the display name and blank initial progress. Enter a wrong password once and verify a clear error without a crash.
-2. **Recovery:** sign out, request a reset, open the email, set matching new passwords, and sign in with the new password. Try an expired/used link and verify guidance. Request a reset for an unregistered address: it should not reveal whether that account exists.
-3. **Persistence:** save a note, favorite and settings. Reload and sign in on a second device. Check that the same data remains. Sign out and attempt to open `/collection` or `/api/state`; private data must be unavailable.
-4. **Isolation:** sign into Account B in the other browser. It must not show A’s words, notes, preferences, daily set, reviews or progress. Add different data in B and return to A. In a test environment, use a normal user token to query other-owned rows directly: RLS must return none, and direct client writes/privileged RPCs must be denied. Do not use the secret key for this check.
-5. **Real AI:** generate an uncached word, inspect every required field, save it, and reload. Check OpenAI usage and the canonical database row. A repeated lookup should use the cache. Missing/bad keys must yield a useful error, never a fake lesson.
-6. **Daily composition:** add three personal words and two suggestions. Replace one before starting. Start and confirm replacement is locked. Complete all five words through every phase, including sentences and confidence. Reload: five completed words, XP and next review dates must remain.
-7. **Reviews:** after a due time (or using a disposable test account with controlled test dates), complete a due review. Incorrect recall should schedule about ten minutes later; confident repeated success should expand intervals. Check older learned words remain reviewable.
-8. **Cambridge:** without a license, check the external link. With licensed configuration, test entry display, attribution, alternate-entry link, missing-word fallback and optional UK/US audio. Inspect browser requests: no Cambridge or OpenAI secret key should appear. Export the wordbook: it must contain no Cambridge content.
-9. **PWA/network:** install from iPhone Safari, close/reopen, verify session behavior, enable airplane mode and confirm honest offline guidance. Reconnect before saving. Verify there is no horizontal clipping on forms, quizzes or navigation.
-10. **Operations:** verify rate limits, provider billing notifications, a backup/recovery process, the intended privacy policy and a working way for users to contact you. Account deletion is currently operator-managed through Supabase Auth; deletion cascades private rows while shared vocabulary remains.
+Automated tests do not send real email or consume OpenAI credits. Database tests use PGlite, an embedded PostgreSQL engine, with simulated Supabase Auth roles. They execute the migration runner, SQL policies and database functions. Account browser tests run the actual Next.js routes and SSR cookies against a local Auth stand-in; learning journeys use local demo state. These are useful integration checks, but they do not establish hosted email delivery or production persistence.
 
-## What is intentionally limited
+Browser tests start their own servers sequentially on `127.0.0.1:4172` and `:4173`, with a local Auth fixture on `:4174`. They override service settings with test values and refuse to reuse a running server. Stop other processes using these test ports. The account server disables real AI and Cambridge. Optional Today screenshots use `E2E_SCREENSHOTS=true`; normal account screenshots and failure traces go to ignored `test-results/` paths.
 
-The device demo is local-only. Real accounts use Supabase. The bundled suggestions are a finite original starter curriculum, ranked by interests, level, saved/dismissed words and weak-category practice; arbitrary new vocabulary comes through Add a word. Personal sentences receive a word-presence check and self-assessment, not AI grading. This is a personal practice tool, not a credential or competitive exam. Completed words persist; an unfinished word restarts if you navigate away. Review scheduling is an explicit SM-2-inspired heuristic, described in [scheduling](docs/spaced-repetition.md).
+For an explicitly requested live sign-in smoke test, set `E2E_BASE_URL` to the HTTPS deployment origin and `E2E_EMAIL` / `E2E_PASSWORD` to a dedicated confirmed test account in your private shell environment. Then run `npx playwright test --config playwright.live.config.ts`. This separate configuration never starts a local server and disables traces, screenshots and video. It is excluded from normal automated verification; it logs in and out but does not send email or request AI content. Never put real test passwords in command examples or committed files.
 
-Cambridge approval, actual provider content rights, real email delivery, OpenAI billing/model access, a public Vercel deployment and physical-iPhone behavior cannot be proven by local fixture tests. Complete the live checklist after connecting your services. No background push service or invented completion claim is included.
+GitHub Actions runs the same clean installation, lint, TypeScript, unit/database tests, build and browser checks on Node 24. A job waiting for a hosted runner has not tested any code yet. Check the [Actions page](https://github.com/alinikan/LexiLoop/actions), runner availability and account restrictions before changing source to address a queue delay.
 
-## Code map
+See [verification notes](docs/verification.md) for the latest recorded results and their boundaries.
 
-`app/` contains protected/public pages and server endpoints; `components/` holds the UI; `lib/domain.ts` owns learning rules; `lib/spaced-repetition/` owns scheduling; `lib/ai/` owns original generation; `lib/dictionary/` owns Cambridge; `lib/db/` owns authenticated persistence; `supabase/migrations/` owns SQL; `tests/` contains domain, provider, route, database and browser checks.
+## Post-deployment checklist
 
-See [architecture](docs/architecture.md), [AI content](docs/ai-content.md), [audit](docs/production-audit.md), and [verification](docs/verification.md). No service credentials, private learner data, generated build output or dependency folders belong in the source archive.
+A green build means code compiled and deployed. It does not prove that live Supabase credentials, SMTP, OpenAI billing or password recovery work. Use accounts and inboxes you control for these checks:
+
+- [ ] Open the base production URL while signed out; it should redirect to `/login`.
+- [ ] Create an account, receive its email, follow the confirmation link, then sign in.
+- [ ] Check invalid email/short-password guidance and a wrong-password attempt.
+- [ ] Save profile preferences and a starter word. Reload, sign out and sign back in; confirm they remain.
+- [ ] Select a daily set, replace a word before starting, and verify that starting locks it.
+- [ ] Finish a lesson; reload and check review scheduling and progress.
+- [ ] Request a word not already in the starter set or database. This can incur API cost. Inspect the generated lesson, save it and reload.
+- [ ] Request that word again and verify no additional generation in OpenAI usage/logs; the saved database lesson should be reused.
+- [ ] Request a reset email, follow it, change the password and sign in with the new password.
+- [ ] Confirm an expired/reused email link gives useful guidance.
+- [ ] Use a second account in another browser profile. Confirm private notes, settings and history are not shared. Shared definitions are expected.
+- [ ] Check mobile and tablet layouts, keyboard navigation, dark mode and reduced motion.
+- [ ] Try going offline: loaded words may remain readable, but changes must not falsely report saved.
+- [ ] Check Vercel runtime logs and Supabase Auth/database logs for unexpected failures without sharing secret values.
+- [ ] Review API billing and limits. Test failure handling with fixtures; do not deliberately spend all real credits to reproduce exhaustion.
+
+On iPhone, open the HTTPS app in Safari, choose Share (or More → Share), then Add to Home Screen. Enable Open as Web App if offered and tap Add. Check sign-in and navigation from the installed icon. Chromium phone emulation does not verify physical Safari or iOS installation.
+
+## Troubleshooting
+
+### Strange TypeScript packages such as `node 3` or `react 3`
+
+These can indicate malformed copied folders in `node_modules/@types`, not missing legitimate packages. Stop development/test servers and rebuild generated dependencies/output.
+
+macOS:
+
+```bash
+rm -rf node_modules .next
+nvm use
+npm ci
+npm run verify
+```
+
+Windows PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force node_modules, .next -ErrorAction SilentlyContinue
+npm ci
+npm run verify
+```
+
+Run these only inside the project. `node_modules` and `.next` are generated; your source and `.env.local` are separate. Do not install fake packages with those names or weaken TypeScript checks. Never copy `node_modules` from another installation. If numbered folders reappear after a successful reinstall, check whether a sync, restore, or copy process is recreating generated files. The folder names alone do not identify the cause. Keep active dependencies out of conflicting synchronization workflows; changing TypeScript settings will not repair them.
+
+### Migration script says DATABASE_URL is missing
+
+Make sure `.env.local` is beside `package.json`, with exactly one nonempty `DATABASE_URL=` entry. A later duplicate blank entry can override the intended value. This command checks presence without printing the value:
+
+```bash
+node --env-file=.env.local -e "console.log(process.env.DATABASE_URL?.trim() ? 'DATABASE_URL is set' : 'DATABASE_URL is missing')"
+```
+
+It does not validate the password or network. For connection failures, check direct/Session Pooler settings, database password, TLS and project availability. Never paste the connection string into an issue.
+
+### Confirmation or recovery email fails
+
+Check Gmail 2-Step Verification, the App Password, matching sender/username, spam folders, Supabase Auth logs and rate limits. Google may revoke App Passwords after an account password change. Check that templates and redirect allowlists match the environment where the request began. A SiteURL-based template always points to the project's Site URL.
+
+### AI generation fails but saved words work
+
+Check the fixed server error category, OpenAI project/model access, current credits and request limits. Ensure the private key is in the correct Vercel environment and redeploy after changing it. Malformed-lesson guidance is different from provider-unavailable guidance. Local starter words succeeding does not prove live AI works.
+
+### Changes or progress seem missing
+
+Check the account, selected timezone, archive/search filters and connectivity. A revision conflict means another tab changed the account: reload before retrying. Check that migrations are applied and Supabase is available. Clearing browser storage removes demo data; real account data is stored in Supabase.
+
+### Deployment succeeds but the app fails
+
+Inspect runtime logs and follow the post-deployment checklist. Check missing environment values, wrong origins, paused database, SMTP delivery and OpenAI billing. Route symbols such as static, dynamic and proxy in the build output describe how Next.js serves routes; they are not evidence of a runtime failure.
+
+## Security, cost and operations
+
+Secrets stay in ignored `.env.local`, Vercel's private environment or Supabase SMTP settings. Do not commit them, put them into screenshots, or prefix them with `NEXT_PUBLIC_`. `lib/db`, OpenAI and Cambridge provider modules have server-only import boundaries. Mutating APIs check the exact request origin and verify identity before privileged work. Authentication cookies are HttpOnly and SameSite=Lax, and Secure in production; session refresh follows Supabase SSR patterns.
+
+No analytics, payment system, Redis, cron job, storage bucket or external font service is required. Learners do not supply their own OpenAI keys. The code can be developed locally with free tools, but running the complete live app is not guaranteed to be free: OpenAI bills usage and other services have plan limits. Gmail is the private deployment's email choice; transactional email and custom domains are optional future costs.
+
+Capacity depends on actual usage, email delivery, database size, hosting resources and AI cost. There is no fixed guaranteed user count. Review current [Supabase plans](https://supabase.com/pricing) and [Vercel plans](https://vercel.com/pricing); account for plan-specific inactivity and backup behavior. Vercel Hobby has personal/non-commercial restrictions. Use an appropriate plan if the app's purpose changes.
+
+Back up the database according to the importance of its data and test restoration separately. A learner's JSON export is not a complete server backup. Account deletion is currently operator-managed through Supabase Auth and cascades private records; shared lesson content remains. Rotate any exposed credential with its provider, update the relevant configuration and redeploy as necessary.
+
+## Optional learning tutorials
+
+Choose **Show me how** in the optional invitation to enable the pocket guides. Each main page explains its goal and controls in short steps. Use **Next tip**, **Back tip**, or a step title to explore, and **Hide guide** to return to practice. **Got it, let’s try** closes the guide; **Open guide** replays it.
+
+Choose **No thanks** or **Turn off tips** to dismiss tutorials. Re-enable them in **Settings → Learning tips**. This preference is stored in this browser, not synced between accounts or devices; if browser storage is unavailable, it works for the current visit. The guides are optional, keyboard accessible, responsive, and use the current light/dark appearance without adding animation. They make no AI requests.

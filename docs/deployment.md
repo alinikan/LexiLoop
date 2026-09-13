@@ -1,5 +1,7 @@
 # Deployment and operations
 
+The existing app is [lexiloop-ali.vercel.app](https://lexiloop-ali.vercel.app), deployed from [alinikan/LexiLoop](https://github.com/alinikan/LexiLoop). Gmail SMTP is configured in Supabase for private use; Cambridge remains optional and disabled.
+
 The **README is the complete, current setup manual**. Follow it for Supabase, SMTP, OpenAI, Cambridge, GitHub, Vercel and iPhone installation. This document records operational behavior rather than duplicating environment instructions.
 
 - Install with `npm ci`, use Node 24, and keep the lockfile.
@@ -7,6 +9,7 @@ The **README is the complete, current setup manual**. Follow it for Supabase, SM
 - Migration execution holds a PostgreSQL advisory lock; each SQL file and ledger entry commit in one transaction. Failures roll back that migration.
 - Use the modern server-only `SUPABASE_SECRET_KEY`, not the previous build's obsolete variable name. Do not add `DATABASE_URL` to Vercel unless a deliberate migration job needs it.
 - Deploy the Next.js runtime, not a static export. Configure all real services and canonical HTTPS callback URLs, then redeploy after changing environment variables.
+- Local HTTP is valid for development. Use `npm run check:production -- --app-url https://lexiloop-ali.vercel.app` to check deployment-style configuration without changing `.env.local`. This overrides only the origin, not other settings or Vercel values.
 - `npm run check:production` validates production variable presence/origins/modes without printing values. It is not a live credential or billing test.
 - Public previews should use an isolated Supabase project. Never use untrusted preview branches with production secrets or broad auth redirects.
 

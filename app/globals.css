@@ -2687,3 +2687,260 @@ html[data-motion='reduce'] *::after {
 :root[data-theme='dark'] .button:not(.secondary):not(.lime) {
   color: #141827;
 }
+
+/* Optional, in-flow learning guides stay clear of lesson controls. */
+.tips-invite,
+.tutorial {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  margin-bottom: 28px;
+}
+.tips-invite {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 24px;
+}
+.tips-emblem {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: var(--lime);
+  color: #35451c;
+}
+.tips-invite strong {
+  font-size: 15px;
+}
+.tips-invite p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+.tips-invite-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.tips-invite .button,
+.tutorial .button {
+  font-size: 13px;
+  min-height: 44px;
+}
+.tips-invite .text-link,
+.tutorial .text-link {
+  font-size: 13px;
+  min-height: 44px;
+}
+.tutorial {
+  overflow: hidden;
+  border-color: var(--primary);
+}
+.tutorial-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 24px;
+  background: var(--primary-soft);
+}
+.tutorial-heading > div {
+  flex: 1;
+}
+.tutorial-heading .eyebrow {
+  font-size: 10px;
+  color: var(--primary);
+}
+.tutorial-heading h2 {
+  font-size: 19px;
+  margin: 3px 0 0;
+  letter-spacing: -0.5px;
+}
+.tutorial-goal {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 18px 24px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.tutorial-goal span {
+  font-weight: 750;
+  white-space: nowrap;
+  color: var(--primary);
+}
+.tutorial-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.5fr);
+  gap: 24px;
+  padding: 24px;
+}
+.tutorial-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.tutorial-steps button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  min-height: 44px;
+  color: var(--muted);
+}
+.tutorial-steps button[aria-current] {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+}
+.tutorial-steps button > span {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 12px;
+}
+.tutorial-steps button[aria-current] > span {
+  background: var(--primary);
+  color: var(--surface);
+  border-color: var(--primary);
+}
+.tutorial-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+.tutorial-card .eyebrow {
+  font-size: 10px;
+  color: var(--muted);
+}
+.tutorial-card h3 {
+  font-size: 22px;
+  margin: 10px 0;
+}
+.tutorial-card p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 0 0 22px;
+}
+.tutorial-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tutorial-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px 15px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tips-switch {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 650;
+}
+.tips-switch-track {
+  width: 44px;
+  padding: 4px;
+  border-radius: 24px;
+  background: var(--muted);
+}
+.tips-switch-track > span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.tips-switch[aria-checked='true'] .tips-switch-track {
+  background: var(--primary);
+}
+.tips-switch[aria-checked='true'] .tips-switch-track > span {
+  margin-left: 18px;
+}
+@media (max-width: 1000px) {
+  .tips-invite {
+    flex-wrap: wrap;
+  }
+  .tips-invite-actions {
+    margin-left: 64px;
+  }
+}
+@media (max-width: 600px) {
+  .tips-invite {
+    padding: 18px;
+    gap: 12px;
+  }
+  .tips-invite > div:first-of-type {
+    flex: 1;
+  }
+  .tips-invite-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .tutorial-heading {
+    padding: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .tutorial-heading h2 {
+    font-size: 17px;
+  }
+  .tutorial-heading > .text-link {
+    margin-left: 56px;
+  }
+  .tutorial-goal {
+    padding: 16px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tutorial-body {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 14px;
+  }
+  .tutorial-steps {
+    gap: 2px;
+  }
+  .tutorial-card {
+    padding: 16px;
+  }
+  .tutorial-card h3 {
+    font-size: 20px;
+  }
+  .tutorial-controls {
+    flex-wrap: wrap;
+  }
+  .tutorial-foot {
+    padding: 0 16px 12px;
+    flex-wrap: wrap;
+  }
+}
