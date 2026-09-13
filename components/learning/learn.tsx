@@ -6,6 +6,8 @@ import { BookOpen, ArrowRight } from 'lucide-react';
 import { useStore } from '../store';
 import { todaySet } from '@/lib/domain';
 import { Session } from './session';
+import { ResumeSession } from './resume';
+import { workspace } from '@/lib/practice';
 import type { Word } from '@/lib/ai/schemas';
 export function Learn() {
   const { state, catalog, dispatch, busy } = useStore(),
@@ -13,6 +15,13 @@ export function Learn() {
     today = todaySet(state);
   const [words, setWords] = useState<Word[] | null>(null);
   if (words) return <Session words={words} kind="learn" onDone={() => router.push('/')} />;
+  if (workspace(state).sessions.learn)
+    return (
+      <ResumeSession
+        kind="learn"
+        onResume={(names) => setWords(names.map((name) => catalog.find((w) => w.word === name)!))}
+      />
+    );
   const remaining = today.words.filter((w) => !today.completed.includes(w));
   return (
     <div className="empty-state panel lesson-intro">
@@ -58,7 +67,8 @@ export function Learn() {
         </Link>
       )}
       <p className="tiny">
-        Completed words are saved as you go. An unfinished word restarts if you leave.
+        Your question, answers and completed words are saved as you go. Wait for the saved status
+        before closing.
       </p>
     </div>
   );

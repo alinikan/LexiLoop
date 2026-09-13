@@ -7,6 +7,8 @@ import { useStore } from '../store';
 import { dueWords } from '@/lib/domain';
 import type { Word } from '@/lib/ai/schemas';
 import { Session } from './session';
+import { ResumeSession } from './resume';
+import { workspace } from '@/lib/practice';
 export function Review() {
   const { state, catalog } = useStore(),
     params = useSearchParams();
@@ -18,6 +20,7 @@ export function Review() {
   function start(names: string[]) {
     setSession(names.map((n) => catalog.find((w) => w.word === n)!).filter(Boolean));
   }
+  if (workspace(state).sessions.review) return <ResumeSession kind="review" onResume={start} />;
   const manual = learned.find((w) => w.word === selected);
   return (
     <>

@@ -1,3 +1,41 @@
+# Vocabulary experience verification — 2026-09-13
+
+This is the latest verification for the editable recommendations, adaptive practice, resumable sessions, multi-word usage, memory evidence, capture inbox and contextual tips update. Earlier maintenance results are retained below as history.
+
+| Check                                                                    | Final result                                                                                         |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `npm run verify`                                                         | Passed from clean `.next` output: lint, TypeScript, 108 tests across 10 files, and production build  |
+| `E2E_SCREENSHOTS=true npx playwright test --config playwright.config.ts` | 49 passed; 1 intentional duplicate mobile-matrix skip                                                |
+| `npx playwright test --config playwright.auth.config.ts`                 | 12 passed across desktop, tablet and phone configurations                                            |
+| Source integrity                                                         | UTF-8 text and JSON checks passed; no numbered dependency type folders                               |
+| `git diff --check`                                                       | Passed                                                                                               |
+| `git fsck --full`                                                        | No corrupt objects; only a benign unreferenced empty tree                                            |
+| Credential scan                                                          | No matches in 127 current files, 142 reachable historical Git blobs, or 26 production browser assets |
+
+The two browser configurations are the same configurations orchestrated sequentially by `npm run test:e2e`. Together they passed 61 checks. The final core verification ran after browser servers exited and generated output was removed. No paid AI calls, real email messages, hosted schema changes or deployments were made.
+
+## What the new tests establish
+
+- Recommendations do not mutate the collection until accepted; edited daily goals do not change the usual goal. Priority ranking is deterministic, unavailable words are excluded, and started sets cannot be replaced.
+- Captures can be saved before any lexical card exists, edited, restored after reload and converted into a personal card with context. Failed card creation does not remove the capture.
+- Sessions preserve the question, selected/checked answer, unfinished typing, sentence and confidence. Browser tests resume after reload and midnight. Domain tests verify that completion updates the original daily set and advances the saved checkpoint atomically.
+- Reviews adapt to recent skill mistakes while always testing recall before showing the answer. Delayed recall excludes short-gap reviews and confidence-only results; vocabulary usage reflections do not change recall accuracy or award XP.
+- Contextual tips are opt-in, individually dismissible and replayable. Desktop and mobile layouts were checked, and recommendation/memory screenshots were inspected.
+- Account-mode browser tests simulate a failed state write, retry it, and resume the selected answer in another page using shared account-state fixtures. These tests do not use local demo storage, but the learning-state backend in this browser test remains a fixture.
+- Embedded PostgreSQL tests run migration 003 through the real migration runner, test repeat execution, atomic revision handling and owner-only access to private workspace data. Read-path tests verify older paused daily sets and an actionable error when migration 003 is missing.
+
+## Failures corrected during verification
+
+The new recommendation heading made an old account-test heading selector ambiguous; it now identifies the page's level-one heading. A delayed-recall fixture initially completed a lesson before its setup date; the fixture now creates the lesson and then advances time. The new account test initially navigated before sign-in finished; it now waits for the authenticated destination. A read-path fixture was corrected to match the database's nested `data` column response. Initial implementation type/lint issues were corrected without disabling checks. All final runs above passed.
+
+## Deployment and practical limits
+
+Apply `003_vocabulary_practice.sql` using `npm run db:migrate` before deploying this code. It extends existing profile storage and atomic state saves; earlier migrations and existing history are preserved. The migration is prepared and tested locally, but has not been applied to the hosted database in this update.
+
+After deployment, complete the README's real-account, cross-device resume and export checks. Account saving requires connectivity. Drafts autosave after a brief pause and attempt a save when the page is hidden; wait for the saved status before closing. Unsaved input cannot be guaranteed after an abrupt browser/device shutdown. One draft per session kind is retained, and inbox/journal capacity is explicitly limited to 100 entries each. Usage feedback checks word presence and records the user's reflection, not independent semantic or grammar assessment.
+
+---
+
 # Verification — 2026-09-13 maintenance audit
 
 This report records the current maintenance pass. The earlier build had 38 tests; the counts below describe fresh executions, not a reconstruction of the earlier local cleanup.
@@ -6,16 +44,16 @@ This report records the current maintenance pass. The earlier build had 38 tests
 
 The final repaired-install run used Node 24.21.0 and npm 11.19.0, with locked Next.js 16.3.5. Earlier checks in this maintenance pass used Node 24.13.1/npm 11.8.0. The project's Node 24 recommendation does not require an identical patch version on every computer.
 
-| Command/check | Final result |
-| --- | --- |
-| `npm ci` | Passed; repaired install added 417 packages, zero audited vulnerabilities |
-| `npm run lint` | Passed |
-| `npm run typecheck` | Passed after dependency repair, with generated `.next` output removed |
-| `npm test` | 95 tests passed across 8 files |
-| `npm run build` | Passed from clean generated output |
-| `E2E_SCREENSHOTS=true npm run test:e2e` | 44 passed (35 learning/demo + 9 account); 1 intentional duplicate mobile-matrix skip |
-| `npm run check:production` | Expected rejection of local HTTP, with explanatory guidance |
-| `npm run check:production -- --app-url https://lexiloop-ali.vercel.app` | Passed structural configuration checks |
+| Command/check                                                           | Final result                                                                         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `npm ci`                                                                | Passed; repaired install added 417 packages, zero audited vulnerabilities            |
+| `npm run lint`                                                          | Passed                                                                               |
+| `npm run typecheck`                                                     | Passed after dependency repair, with generated `.next` output removed                |
+| `npm test`                                                              | 95 tests passed across 8 files                                                       |
+| `npm run build`                                                         | Passed from clean generated output                                                   |
+| `E2E_SCREENSHOTS=true npm run test:e2e`                                 | 44 passed (35 learning/demo + 9 account); 1 intentional duplicate mobile-matrix skip |
+| `npm run check:production`                                              | Expected rejection of local HTTP, with explanatory guidance                          |
+| `npm run check:production -- --app-url https://lexiloop-ali.vercel.app` | Passed structural configuration checks                                               |
 
 The final `npm run verify` executed lint, typecheck, all 95 unit/route/database tests and build successfully. A dependency-corruption recurrence was actually observed during this pass: eight empty numbered folders such as `node 2` and `react 2` appeared in `node_modules/@types`. A fresh `npm ci` removed them. Their cause was not established; no fake packages or TypeScript workarounds were added. The initial failed clean check is not counted as passing. npm reported an ESLint support/deprecation notice and install-script policy notices; installation, tests and build still completed. No dependency versions or lockfile were changed.
 

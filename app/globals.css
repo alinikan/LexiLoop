@@ -2944,3 +2944,191 @@ html[data-motion='reduce'] *::after {
     flex-wrap: wrap;
   }
 }
+
+/* Vocabulary tools: quiet, editable and grounded in the user's own words. */
+.daily-plan,
+.resume-panel,
+.memory-progress {
+  margin: 24px 0;
+}
+.daily-plan .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daily-plan h2,
+.vocabulary-tools h2,
+.memory-progress h2 {
+  font-size: 24px;
+}
+.daily-plan p,
+.vocabulary-tools p,
+.memory-progress p,
+.resume-panel p {
+  color: var(--muted);
+  font-size: 14px;
+}
+.plan-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 14px 0 20px;
+}
+.plan-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.plan-option input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.plan-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.plan-option small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.context-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--primary-soft);
+  margin: 16px 0;
+  font-size: 13px;
+}
+.context-tip > svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.context-tip > div {
+  flex: 1;
+}
+.context-tip p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.context-tip button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.vocabulary-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 28px;
+  align-items: start;
+}
+.vocabulary-tools form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0;
+}
+.inbox-list,
+.usage-history {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.inbox-list article,
+.usage-history article {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.inbox-list h3,
+.usage-history h3 {
+  font-size: 18px;
+}
+.usage-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.usage-words button {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 24px;
+  padding: 8px 14px;
+  min-height: 44px;
+}
+.usage-words button[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.usage-checks details {
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 10px;
+  margin: 5px 0;
+}
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 24px 0;
+}
+.memory-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memory-grid strong {
+  font-size: 25px;
+  color: var(--primary);
+}
+.memory-grid span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.session-save {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1000px) {
+  .vocabulary-tools {
+    grid-template-columns: 1fr;
+  }
+  .plan-options {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .plan-options {
+    grid-template-columns: 1fr;
+  }
+  .memory-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .context-tip {
+    flex-wrap: wrap;
+  }
+  .daily-plan .section-heading {
+    flex-direction: column;
+  }
+  .memory-grid strong {
+    font-size: 21px;
+  }
+}

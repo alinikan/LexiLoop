@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { useStore } from './store';
 import { todaySet, dueWords, metrics } from '@/lib/domain';
+import { DailyPlan } from './daily-plan';
+import { CaptureInbox, UseTogether } from './vocabulary-tools';
+import { workspace } from '@/lib/practice';
 import { Onboarding } from './settings';
 export function Today() {
   const { state, catalog, dispatch, busy } = useStore();
@@ -147,6 +150,12 @@ export function Today() {
           </span>
         </aside>
       </div>
+      <DailyPlan key={today.date} />
+      {workspace(state).sessions.learn && (
+        <p className="notice">
+          <Link href="/learn">Your saved lesson is waiting. Resume where you left off →</Link>
+        </p>
+      )}
       <section className="today-words">
         <div className="section-heading">
           <div>
@@ -206,6 +215,10 @@ export function Today() {
           ))}
         </div>
       </section>
+      <div className="vocabulary-tools">
+        <CaptureInbox />
+        <UseTogether />
+      </div>
       <section className="home-bottom">
         <div className="practice-tip">
           <span className="tip-icon">

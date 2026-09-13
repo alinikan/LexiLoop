@@ -11,8 +11,9 @@ export default function Privacy() {
         <h2>What is saved</h2>
         <p>
           Your email is managed by Supabase Auth. Your account stores your words, notes, encountered
-          sentences, daily goals, settings, and review history. Other users cannot read your
-          learning data.
+          sentences, daily goals, settings, review history, unfinished session answers, quick
+          captures, skill results, and your self-assessed vocabulary practice journal. Other users
+          cannot read your learning data.
         </p>
         <h2>AI word lessons</h2>
         <p>
@@ -43,8 +44,11 @@ export default function Privacy() {
         <h2>Your choices</h2>
         <p>
           Export your wordbook from Settings. Edit notes, archive words, and reset schedules from
-          your collection. The app operator can permanently delete your account in Supabase; this
-          cascades to all personal learning records. Shared lexical definitions remain.
+          your collection. You can remove captures and practice journal entries, or discard
+          unfinished sessions. Export includes these private records. Learning-tip preferences and
+          dismissals are stored in this browser. The app operator can permanently delete your
+          account in Supabase; this cascades to all personal learning records. Shared lexical
+          definitions remain.
         </p>
       </section>
     </main>

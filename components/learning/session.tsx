@@ -1,20 +1,19 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useRef, useEffect, type SetStateAction } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  createSession,
+  workspace,
+  practiceSteps,
+  stepSkill,
+  weakSkills,
+  type SessionDraft,
+} from '@/lib/practice';
+import { ContextTip } from '../tutorial';
 import { ArrowRight, Check, Volume2, Lightbulb, Trophy, X } from 'lucide-react';
 import { useStore } from '../store';
 import { todaySet } from '@/lib/domain';
 import type { Word } from '@/lib/ai/schemas';
-const steps = [
-  'Discover',
-  'Understand',
-  'Context',
-  'Distinguish',
-  'Recall',
-  'Make it yours',
-  'Apply',
-  'Recap',
-];
 export function Session({
   words,
   kind,
@@ -25,23 +24,134 @@ export function Session({
   onDone: () => void;
 }) {
   const { state, dispatch, busy } = useStore();
-  const [lessonDay] = useState(() => todaySet(state).date);
-  const [index, setIndex] = useState(0),
-    [step, setStep] = useState(0),
-    [answer, setAnswer] = useState<number | null>(null),
-    [text, setText] = useState(''),
-    [sentence, setSentence] = useState(''),
-    [checked, setChecked] = useState(false),
-    [mistakes, setMistakes] = useState(0),
-    [confidence, setConfidence] = useState(2),
-    [done, setDone] = useState(false),
-    [id, setId] = useState(() => crypto.randomUUID());
+  const router = useRouter();
+  const [draft, setDraft] = useState<SessionDraft>(
+    () =>
+      workspace(state).sessions[kind] ??
+      createSession(
+        state,
+        words.map((w) => w.word),
+        kind,
+        todaySet(state).date,
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ),
+  );
+  const [done, setDone] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(() =>
+    workspace(state).sessions[kind] ? 'Your place is saved' : 'Saving your place…',
+  );
+  const saved = useRef(JSON.stringify(workspace(state).sessions[kind] ?? null));
+  const live = useRef(draft);
+  useEffect(() => {
+    live.current = draft;
+  }, [draft]);
+  const send = useRef(dispatch);
+  useEffect(() => {
+    send.current = dispatch;
+  }, [dispatch]);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flight = useRef<Promise<boolean> | null>(null);
+  const finalizing = useRef(false);
+  const [savedKey, setSavedKey] = useState(() =>
+    JSON.stringify(workspace(state).sessions[kind] ?? null),
+  );
+  const pending = JSON.stringify(draft) !== savedKey;
+  async function savePlace() {
+    if (timer.current) clearTimeout(timer.current);
+    if (flight.current) await flight.current;
+    const snapshot = live.current,
+      key = JSON.stringify(snapshot);
+    if (key === saved.current) {
+      setSaveStatus('Your place is saved');
+      return true;
+    }
+    setSaveStatus('Saving your place…');
+    const request = send.current({ type: 'checkpoint', draft: snapshot });
+    flight.current = request;
+    const ok = await request;
+    flight.current = null;
+    if (ok) {
+      saved.current = key;
+      setSavedKey(key);
+      setSaveStatus('Your place is saved');
+    } else setSaveStatus('Not saved yet. Reconnect and retry before leaving.');
+    return ok;
+  }
+  const saver = useRef(savePlace);
+  useEffect(() => {
+    saver.current = savePlace;
+  });
+  useEffect(() => {
+    if (!done && !finalizing.current) timer.current = setTimeout(() => void saver.current(), 400);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [draft, done]);
+  useEffect(() => {
+    function leaving(e: BeforeUnloadEvent) {
+      if (!done && JSON.stringify(live.current) !== saved.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    }
+    const background = () => {
+      if (document.hidden && !done && !finalizing.current) void saver.current();
+    };
+    window.addEventListener('beforeunload', leaving);
+    document.addEventListener('visibilitychange', background);
+    return () => {
+      window.removeEventListener('beforeunload', leaving);
+      document.removeEventListener('visibilitychange', background);
+    };
+  }, [done]);
+  useEffect(() => {
+    async function navigate(event: MouseEvent) {
+      if (
+        done ||
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        event.button !== 0
+      )
+        return;
+      const anchor = (event.target as Element)?.closest?.('a');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (
+        url.origin !== window.location.origin ||
+        (url.pathname === location.pathname && url.search === location.search)
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (await saver.current()) router.push(url.pathname + url.search + url.hash);
+    }
+    document.addEventListener('click', navigate, true);
+    return () => document.removeEventListener('click', navigate, true);
+  }, [done, router]);
+  function field<K extends keyof SessionDraft>(key: K, value: SetStateAction<SessionDraft[K]>) {
+    setDraft((d) => ({
+      ...d,
+      [key]:
+        typeof value === 'function'
+          ? (value as (v: SessionDraft[K]) => SessionDraft[K])(d[key])
+          : value,
+    }));
+  }
+  const { index, step, answer, text, sentence, checked, mistakes, confidence } = draft;
+  const setAnswer = (value: number | null) => field('answer', value);
+  const setText = (value: string) => field('text', value);
+  const setSentence = (value: string) => field('sentence', value);
+  const setConfidence = (value: number) => field('confidence', value);
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     card.current?.focus();
   }, [step, index]);
   const word = words[index];
-  const activeSteps = kind === 'learn' ? steps : ['Recall', 'Context', 'Recap'];
+  const activeSteps = draft.steps;
   const current = activeSteps[step];
   const exercise = word.exercises.find(
     (e) =>
@@ -67,11 +177,42 @@ export function Session({
     ? answer === exercise.answer
     : text.trim().toLowerCase() === word.word.toLowerCase();
   function check() {
-    setChecked(true);
-    if (!correct) setMistakes((m) => m + 1);
+    if (checked) return;
+    const skill = stepSkill(current);
+    setDraft((d) => ({
+      ...d,
+      checked: true,
+      mistakes: d.mistakes + Number(!correct),
+      evidence: skill ? [...d.evidence, { skill, correct }] : d.evidence,
+    }));
   }
   async function next() {
     if (step === activeSteps.length - 1) {
+      finalizing.current = true;
+      if (!(await savePlace())) {
+        finalizing.current = false;
+        return;
+      }
+      const nextDraft: SessionDraft | null =
+        index === words.length - 1
+          ? null
+          : {
+              ...draft,
+              index: index + 1,
+              step: 0,
+              steps: practiceSteps(
+                kind,
+                state.words.find((w) => w.word === words[index + 1].word),
+              ),
+              answer: null,
+              text: '',
+              sentence: '',
+              checked: false,
+              mistakes: 0,
+              confidence: 2,
+              evidence: [],
+              eventId: crypto.randomUUID(),
+            };
       const quality = mistakes > 0 ? 0 : confidence <= 1 ? 1 : confidence === 4 ? 3 : 2;
       if (
         !(await dispatch({
@@ -79,27 +220,27 @@ export function Session({
           word: word.word,
           quality,
           confidence,
-          day: kind === 'learn' ? lessonDay : undefined,
+          day: kind === 'learn' ? draft.day : undefined,
           kind,
           sentence,
-          id,
+          id: draft.eventId,
+          evidence: draft.evidence,
+          nextSession: nextDraft,
         }))
-      )
+      ) {
+        finalizing.current = false;
         return;
-      if (index === words.length - 1) {
+      }
+      saved.current = JSON.stringify(nextDraft);
+      setSavedKey(JSON.stringify(nextDraft));
+      if (!nextDraft) {
         setDone(true);
         return;
       }
-      setIndex(index + 1);
-      setStep(0);
-      setSentence('');
-      setMistakes(0);
-      setConfidence(2);
-      setId(crypto.randomUUID());
-    } else setStep(step + 1);
-    setChecked(false);
-    setAnswer(null);
-    setText('');
+      setDraft(nextDraft);
+      setSaveStatus('Your place is saved');
+      finalizing.current = false;
+    } else setDraft((d) => ({ ...d, step: d.step + 1, checked: false, answer: null, text: '' }));
   }
   if (done)
     return (
@@ -131,14 +272,40 @@ export function Session({
     );
   return (
     <div className="session">
+      <div className="session-save">
+        <span role="status">
+          {pending && saveStatus === 'Your place is saved' ? 'Saving your place…' : saveStatus}
+        </span>
+        {saveStatus.startsWith('Not saved') && (
+          <button className="text-link" onClick={() => void savePlace()}>
+            Retry save
+          </button>
+        )}
+      </div>
+      <ContextTip id="resume" title="Your place, kept safe">
+        Answers save automatically after a brief pause. Wait for “Your place is saved” before
+        closing. The close button saves before leaving. Resume the same session on this account,
+        even on another day.
+      </ContextTip>
+      {kind === 'review' &&
+        weakSkills(state.words.find((w) => w.word === word.word)).length > 0 && (
+          <p className="notice">
+            Extra practice for{' '}
+            {weakSkills(state.words.find((w) => w.word === word.word)).join(', ')} based on recent
+            answers. Recall still comes first.
+          </p>
+        )}
       <div className="lesson-top">
-        <Link
-          href={kind === 'learn' ? '/' : '/review'}
+        <button
           className="icon-button"
           aria-label="Leave session"
+          disabled={busy}
+          onClick={async () => {
+            if (await savePlace()) router.push(kind === 'learn' ? '/' : '/review');
+          }}
         >
           <X size={22} />
-        </Link>
+        </button>
         <div
           className="progress-track"
           role="progressbar"
@@ -226,6 +393,7 @@ export function Session({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
+                maxLength={2000}
                 value={text}
                 disabled={checked}
                 onChange={(e) => setText(e.target.value)}
@@ -262,6 +430,13 @@ export function Session({
               usage with the pattern.
             </p>
           </>
+        )}
+        {current === 'Recap' && (
+          <ContextTip id="confidence" title="Rate recall, not perfection">
+            “I can use it” means you could choose this word naturally in a conversation. Your
+            answers and confidence schedule your next review; confidence alone is not proof of
+            lasting memory.
+          </ContextTip>
         )}
         {current === 'Recap' && (
           <>

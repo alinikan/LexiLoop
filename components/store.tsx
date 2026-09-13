@@ -12,6 +12,8 @@ import { catalog as seed } from '@/data/catalog';
 import { initialState, applyCommand, type State, type Command } from '@/lib/domain';
 import { type Word, validateWord } from '@/lib/ai/schemas';
 import { demoMode } from '@/lib/config';
+import { ZodError } from 'zod';
+import { commandSchema } from '@/lib/validation/commands';
 import { inputWordSchema } from '@/lib/validation/word';
 type Store = {
   state: State;
@@ -38,7 +40,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [message, setMessage] = useState('');
   const [, refreshClock] = useState(0);
   const current = useRef(state),
-    locked = useRef(false);
+    queue = useRef<Promise<unknown>>(Promise.resolve());
   const reload = useCallback(async () => {
     setError('');
     try {
@@ -127,12 +129,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return () => clearTimeout(timer);
     }
   }, [message]);
-  async function dispatch(command: Command) {
-    if (locked.current) return false;
-    locked.current = true;
+  function dispatch(command: Command): Promise<boolean> {
+    const run = queue.current.then(() => perform(command));
+    queue.current = run.catch(() => {});
+    return run;
+  }
+  async function perform(command: Command) {
     setBusy(true);
     setError('');
     try {
+      command = commandSchema.parse(command);
       let next: State;
       if (demoMode) {
         const raw = localStorage.getItem(KEY);
@@ -147,6 +153,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         const res = await fetch('/api/state', {
           method: 'POST',
+          keepalive: command.type === 'checkpoint',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ version: current.current.version, command }),
         });
@@ -165,10 +172,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setState(next);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Your change could not be saved. Try again.');
+      setError(
+        e instanceof ZodError
+          ? e.issues[0].message
+          : e instanceof Error
+            ? e.message
+            : 'Your change could not be saved. Try again.',
+      );
       return false;
     } finally {
-      locked.current = false;
       setBusy(false);
     }
   }

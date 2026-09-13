@@ -1,8 +1,18 @@
+import {
+  emptyWorkspace,
+  containsWord,
+  type Workspace,
+  type SkillRecord,
+  type Evidence,
+  type SessionDraft,
+} from './practice';
 import { UserError } from '@/lib/errors';
 import type { Word } from './ai/schemas';
 import { freshSchedule, scheduleReview, type Schedule } from './spaced-repetition';
 import { normalizeWord } from './validation/word';
 export type SavedWord = {
+  skills?: SkillRecord;
+  memory?: { attempts: number; correct: number };
   word: string;
   source: 'personal' | 'suggested';
   note: string;
@@ -44,6 +54,7 @@ export type ReviewEvent = {
   date: string;
 };
 export type State = {
+  workspace?: Workspace;
   summary?: {
     reviews: number;
     accuracy: number;
@@ -61,6 +72,19 @@ export type State = {
   dismissed: string[];
 };
 export type Command =
+  | { type: 'daily-plan'; words: string[] }
+  | { type: 'checkpoint'; draft: SessionDraft }
+  | { type: 'discard-session'; kind: 'learn' | 'review' }
+  | { type: 'capture'; id: string; word: string; context: string }
+  | { type: 'remove-capture' | 'remove-usage'; id: string }
+  | {
+      type: 'usage';
+      id: string;
+      words: string[];
+      situation: string;
+      text: string;
+      reflection: 'ready' | 'revisit';
+    }
   | { type: 'settings'; settings: Settings }
   | {
       type: 'save';
@@ -71,11 +95,14 @@ export type Command =
       tag?: string;
       priority?: boolean;
       toToday?: boolean;
+      captureId?: string;
     }
   | { type: 'select' | 'remove' | 'dismiss'; word: string }
   | { type: 'start' }
   | {
       type: 'complete';
+      evidence?: Evidence[];
+      nextSession?: SessionDraft | null;
       word: string;
       quality: 0 | 1 | 2 | 3;
       confidence?: number;
@@ -96,6 +123,7 @@ export type Command =
   | { type: 'reset'; word: string };
 export const initialState = (): State => ({
   version: 0,
+  workspace: emptyWorkspace(),
   settings: {
     goal: 5,
     level: 'B1',
@@ -138,6 +166,7 @@ export function applyCommand(
 ): State {
   const state = structuredClone(input),
     date = dayKey(now, state.settings.timezone);
+  state.workspace ??= emptyWorkspace();
   const today =
     command.type === 'complete' && command.kind === 'learn' && command.day
       ? state.days.find((d) => d.date === command.day)
@@ -150,6 +179,103 @@ export function applyCommand(
     return saved;
   };
   switch (command.type) {
+    case 'daily-plan': {
+      if (today.started) throw new UserError('Finish the started lesson before changing its set.');
+      if (
+        new Set(command.words).size !== command.words.length ||
+        command.words.length > 20 ||
+        !command.words.length
+      )
+        throw new UserError('Choose between 1 and 20 different words.');
+      for (const name of command.words) {
+        if (!catalog.some((w) => w.word === name))
+          throw new UserError('Build the word card first.');
+        const saved = state.words.find((w) => w.word === name);
+        if (saved?.archived || saved?.schedule.firstLearned)
+          throw new UserError('Choose active, unlearned words.');
+        if (!saved)
+          state.words.push({
+            word: name,
+            source: 'suggested',
+            note: '',
+            context: '',
+            tag: '',
+            priority: false,
+            favorite: false,
+            archived: false,
+            addedAt: now.toISOString(),
+            sentence: '',
+            schedule: freshSchedule(),
+          });
+      }
+      today.words = [...command.words];
+      today.goal = command.words.length;
+      break;
+    }
+    case 'checkpoint': {
+      const draft = command.draft;
+      for (const name of draft.words) {
+        const saved = lookup(name);
+        if (saved.archived || (draft.kind === 'review' && !saved.schedule.firstLearned))
+          throw new UserError('This session contains an unavailable word.');
+      }
+      if (draft.kind === 'learn') {
+        const day = state.days.find((d) => d.date === draft.day);
+        if (!day?.started || draft.words.some((w) => !day.words.includes(w)))
+          throw new UserError('This daily session is no longer available.');
+        if (day.completed.includes(draft.words[draft.index]))
+          throw new UserError('This word was already completed. Reload to continue.');
+      }
+      const old = state.workspace.sessions[draft.kind];
+      if (old && old.id !== draft.id)
+        throw new UserError('Resume or discard your saved session before starting another.');
+      state.workspace.sessions[draft.kind] = draft;
+      break;
+    }
+    case 'discard-session':
+      delete state.workspace.sessions[command.kind];
+      break;
+    case 'capture': {
+      const word = normalizeWord(command.word);
+      const old = state.workspace.inbox.find((c) => c.id === command.id);
+      if (!old && state.workspace.inbox.length >= 100)
+        throw new UserError('Your inbox is full. Build or remove a capture first.');
+      if (old) Object.assign(old, { word, context: command.context });
+      else
+        state.workspace.inbox.unshift({
+          id: command.id,
+          word,
+          context: command.context,
+          at: now.toISOString(),
+        });
+      break;
+    }
+    case 'remove-capture':
+      state.workspace.inbox = state.workspace.inbox.filter((c) => c.id !== command.id);
+      break;
+    case 'usage': {
+      if (
+        new Set(command.words).size !== command.words.length ||
+        command.words.length < 2 ||
+        command.words.length > 3
+      )
+        throw new UserError('Choose two or three different words.');
+      command.words.forEach((w) => {
+        if (lookup(w).archived || !containsWord(command.text, w))
+          throw new UserError('Use each selected word in your thought.');
+      });
+      if (state.workspace.usage.some((p) => p.id === command.id)) return input;
+      if (state.workspace.usage.length >= 100)
+        throw new UserError(
+          'Your practice journal is full. Remove an entry before saving another.',
+        );
+      state.workspace.usage.unshift({ ...command, at: now.toISOString() });
+      break;
+    }
+    case 'remove-usage':
+      state.workspace.usage = state.workspace.usage.filter((p) => p.id !== command.id);
+      break;
+
     case 'settings':
       if (
         !Number.isInteger(command.settings.goal) ||
@@ -193,6 +319,8 @@ export function applyCommand(
         sentence: '',
         schedule: freshSchedule(),
       });
+      if (command.captureId)
+        state.workspace.inbox = state.workspace.inbox.filter((c) => c.id !== command.captureId);
       if (command.toToday) {
         if (today.started) throw new UserError('Your lesson has started. Today’s set is locked.');
         if (today.words.length >= today.goal)
@@ -233,6 +361,38 @@ export function applyCommand(
         if (today.completed.includes(command.word)) return input;
         today.completed.push(command.word);
       } else if (!saved.schedule.firstLearned) throw new UserError('Learn this word first.');
+      const evidence = command.evidence ?? [];
+      saved.skills ??= {};
+      for (const e of evidence) {
+        const record = saved.skills[e.skill] ?? { attempts: 0, correct: 0, recent: [] };
+        record.attempts++;
+        record.correct += Number(e.correct);
+        record.recent = [...record.recent, e.correct].slice(-5);
+        saved.skills[e.skill] = record;
+      }
+      const recall = evidence.find((e) => e.skill === 'recall');
+      if (
+        command.kind === 'review' &&
+        recall &&
+        saved.schedule.lastReviewed &&
+        now.getTime() - new Date(saved.schedule.lastReviewed).getTime() >= 86400000
+      ) {
+        saved.memory ??= { attempts: 0, correct: 0 };
+        saved.memory.attempts++;
+        saved.memory.correct += Number(recall.correct);
+      }
+      if (command.nextSession !== undefined) {
+        if (command.nextSession) {
+          if (
+            command.nextSession.kind !== command.kind ||
+            command.nextSession.words.some(
+              (w) => !state.words.some((s) => s.word === w && !s.archived),
+            )
+          )
+            throw new UserError('Invalid next session.');
+          state.workspace.sessions[command.kind] = command.nextSession;
+        } else delete state.workspace.sessions[command.kind];
+      }
       saved.schedule = scheduleReview(saved.schedule, command.quality, now);
       if (command.confidence !== undefined)
         saved.schedule.confidence = Math.max(0, Math.min(4, Math.round(command.confidence)));

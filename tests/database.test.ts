@@ -188,6 +188,7 @@ it('records migrations in the ledger and safely skips a second run', async () =>
   expect((await db.query('select name from lexiloop_migrations order by name')).rows).toEqual([
     { name: '001_initial.sql' },
     { name: '002_production.sql' },
+    { name: '003_vocabulary_practice.sql' },
   ]);
   expect(await migrate(migrationClient())).toEqual([]);
   expect(
@@ -252,4 +253,47 @@ it('rolls back failed schema changes together with their ledger entry', async ()
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+it('saves private drafts and captures atomically with existing revisions and exports', async () => {
+  const [{ revision }] = (
+    await db.query<{ revision: number }>('select revision from profiles where id=$1', [user])
+  ).rows;
+  const state = initialState();
+  state.version = revision + 1;
+  state.workspace!.inbox = [
+    {
+      id: '91000000-0000-4000-8000-000000000001',
+      word: 'reluctant',
+      context: 'Private conversation',
+      at: new Date().toISOString(),
+    },
+  ];
+  await db.query('select commit_learning_state($1,$2,$3::jsonb)', [
+    user,
+    revision,
+    JSON.stringify(state),
+  ]);
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${other}';`);
+  expect((await db.query('select workspace from profiles where id=$1', [user])).rows).toEqual([]);
+  await expect(
+    db.query('select commit_learning_state_v2($1,0,$2::jsonb)', [user, JSON.stringify(state)]),
+  ).rejects.toThrow(/permission denied/);
+  await db.exec(`reset role;`);
+  expect(
+    (await db.query<{ workspace: unknown }>('select workspace from profiles where id=$1', [user]))
+      .rows[0].workspace,
+  ).toEqual(state.workspace);
+  const stale = { ...state, workspace: { sessions: {}, inbox: [], usage: [] } };
+  await expect(
+    db.query('select commit_learning_state($1,$2,$3::jsonb)', [
+      user,
+      revision,
+      JSON.stringify(stale),
+    ]),
+  ).rejects.toThrow(/revision_conflict/);
+  expect(
+    (await db.query<{ workspace: unknown }>('select workspace from profiles where id=$1', [user]))
+      .rows[0].workspace,
+  ).toEqual(state.workspace);
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { practiceCommands, evidenceSchema, sessionSchema } from './practice';
 export const settingsSchema = z.object({
   displayName: z.string().trim().max(60).optional(),
   reducedMotion: z.boolean().optional(),
@@ -23,6 +24,7 @@ export const settingsSchema = z.object({
 });
 const word = z.string().min(2).max(60);
 export const commandSchema = z.discriminatedUnion('type', [
+  ...practiceCommands,
   z.object({ type: z.literal('settings'), settings: settingsSchema }),
   z.object({
     type: z.literal('save'),
@@ -33,6 +35,7 @@ export const commandSchema = z.discriminatedUnion('type', [
     tag: z.string().max(40).optional(),
     priority: z.boolean().optional(),
     toToday: z.boolean().optional(),
+    captureId: z.uuid().optional(),
   }),
   ...(['select', 'remove', 'dismiss', 'reset'] as const).map((type) =>
     z.object({ type: z.literal(type), word }),
@@ -40,6 +43,8 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('start') }),
   z.object({
     type: z.literal('complete'),
+    evidence: evidenceSchema.optional(),
+    nextSession: sessionSchema.nullable().optional(),
     word,
     quality: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
     confidence: z.number().int().min(0).max(4).optional(),

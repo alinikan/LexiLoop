@@ -15,7 +15,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Fill your word slots',
-        'Add a word brings in something you found yourself. Discover lets you choose suggested words. Your daily slots show what you will practice; fill them before starting.',
+        'Preview my recommendations offers an editable set. Select any 1–20 words and accept only what you want. Edit today’s set changes your choices before starting. Quick capture saves discoveries for later; Discover and Add a word offer more choices.',
       ],
       [
         'Learn, then come back',
@@ -59,7 +59,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Keep it in your wordbook',
-        'Save to my words keeps the card in your collection; Save & add to today also fills an available daily slot. Edit word returns to your input. Notes and tags organize your entry; Prioritize this word stores a priority marker, but does not fill a daily slot for you. If a request fails, your input stays ready for another try.',
+        'Save to my words keeps the card in your collection; Save & add to today also fills an available daily slot. Edit word returns to your input. Notes and tags organize your entry; Prioritize this word puts it near the top of future recommendations; you still choose your daily set. If a request fails, your input stays ready for another try.',
       ],
     ],
   },
@@ -81,7 +81,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Finish honestly',
-        'Choose how well you know the word, then Save & continue records the result and schedules future review. Finish the set to complete your daily loop. The close icon leaves the session; unfinished answers are not saved as completed practice.',
+        'Choose how well you know the word, then Save & continue records the result and schedules future review. Your question and answers autosave; wait for the saved status before closing. The close icon saves before leaving. Resume saved lesson continues the same draft, including on a later day.',
       ],
     ],
   },
@@ -95,7 +95,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Recall, check, reflect',
-        'Try the answer before Check answer, read the feedback, and Continue. Rate your confidence honestly and Save & continue. Your results help determine when the word returns.',
+        'Try the answer before Check answer, read the feedback, and Continue. Recent mistakes add focused meaning, recall, distinction or usage exercises to future reviews. Rate your confidence honestly and Save & continue. Your saved review can be resumed.',
       ],
       [
         'Caught up is a good thing',
@@ -131,7 +131,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Understand mastery',
-        'Mastery grows through repeated recall and confidence. A word is marked Mastered once its review interval reaches 30 days and confidence is at least 3. It can still return for review.',
+        'Memory evidence shows typed recall at least 24 hours after the previous practice. Unmeasured history is not guessed. Ready-to-use counts come from your own reflections, not automatic grading. The separate Mastered label uses a 30-day interval and confidence of at least 3.',
       ],
       [
         'Choose one next step',
@@ -208,6 +208,20 @@ export function TutorialSettings() {
         </span>
       </button>
       <p className="tiny">Saved in this browser. Turn tips on anytime to revisit the guides.</p>
+      <button
+        className="text-link"
+        onClick={() => {
+          try {
+            Object.keys(localStorage)
+              .filter((k) => k.startsWith('lexiloop.tip.'))
+              .forEach((k) => localStorage.removeItem(k));
+          } catch {}
+          preference('on');
+          window.dispatchEvent(new Event('lexiloop-tips'));
+        }}
+      >
+        Replay contextual tips
+      </button>
     </div>
   );
 }
@@ -316,5 +330,52 @@ export function Tutorial({ path }: { path: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+export function ContextTip({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const mode = useTips();
+  const dismissed = useSyncExternalStore(
+    subscribe,
+    () => {
+      try {
+        return localStorage.getItem(`lexiloop.tip.${id}`) === 'done';
+      } catch {
+        return false;
+      }
+    },
+    () => false,
+  );
+  const [hidden, setHidden] = useState(false);
+  if (mode !== 'on' || dismissed || hidden) return null;
+  return (
+    <aside className="context-tip" aria-label={title}>
+      <Lightbulb size={20} aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <p>{children}</p>
+      </div>
+      <button
+        type="button"
+        className="text-link"
+        onClick={() => {
+          setHidden(true);
+          try {
+            localStorage.setItem(`lexiloop.tip.${id}`, 'done');
+          } catch {}
+          window.dispatchEvent(new Event('lexiloop-tips'));
+        }}
+      >
+        Got it
+      </button>
+    </aside>
   );
 }

@@ -22,3 +22,5 @@ Supabase authentication links depend on Site URL, allowed redirects and template
 Back up the database according to your plan and data importance, and rehearse restoration on an isolated project. The user's JSON export is an individual wordbook export, not a full operator backup or automatic import format. Account deletion is operator-managed through Supabase Auth and cascades private records. Shared canonical vocabulary remains.
 
 In-app reminders and immediate browser notification tests require no cron/push infrastructure. This release does not send scheduled background push notifications.
+
+The vocabulary update requires `003_vocabulary_practice.sql` before deployment. Run `npm run db:migrate` from the existing checkout; it adds private profile workspace storage and extends atomic saves. Do not rerun old SQL manually or recreate the database. The README includes upgrade and real-account resume checks.

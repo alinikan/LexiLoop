@@ -35,9 +35,26 @@ export async function readState() {
     throw new UserError(
       'Your collection could not be loaded. Check your connection and try again.',
     );
+  if (profile && !Object.prototype.hasOwnProperty.call(profile, 'workspace'))
+    throw new UserError(
+      'Apply database migration 003_vocabulary_practice.sql before using this app version. Your existing progress is safe.',
+    );
+  // A paused lesson can predate the 31-day dashboard window.
+  const savedDay = profile?.workspace?.sessions?.learn?.day;
+  if (savedDay && !days?.some((d) => d.data.date === savedDay)) {
+    const { data: older, error: olderError } = await db
+      .from('daily_word_sets')
+      .select('data')
+      .eq('user_id', user.id)
+      .eq('day', savedDay)
+      .maybeSingle();
+    if (olderError) throw new UserError('Your saved lesson could not be loaded. Please retry.');
+    if (older) days?.push(older);
+  }
   const state: State = {
     ...initialState(),
     version: profile?.revision ?? 0,
+    workspace: profile?.workspace ?? initialState().workspace,
     settings: {
       ...initialState().settings,
       displayName: user.user_metadata?.display_name ?? '',

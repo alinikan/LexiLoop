@@ -2,6 +2,7 @@
 import { Trophy, Flame, Target, BookOpen, Check } from 'lucide-react';
 import { useStore } from './store';
 import { metrics, dayKey } from '@/lib/domain';
+import { MemoryProgress } from './vocabulary-tools';
 import { achievements } from '@/data/catalog';
 export function Progress() {
   const { state } = useStore(),
@@ -26,6 +27,7 @@ export function Progress() {
           <p>Every word you practice is another way to express yourself.</p>
         </div>
       </div>
+      <MemoryProgress />
       <div className="stats-grid">
         {[
           { icon: BookOpen, value: stats.learned, label: 'Words learned' },

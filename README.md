@@ -2,7 +2,7 @@
 
 **Small steps. Lasting words.**
 
-LexiLoop helps you learn useful English words and remember them through short daily lessons and scheduled review. Save a word from your own life, choose suggestions, practice it in context, and return when it is due for another review.
+LexiLoop helps you expand your vocabulary and use new words naturally in everyday conversations. It focuses on word knowledge, recall and personal expression, not general English instruction or grammar grading. Save a word from your own life, choose suggestions, practice it in context, and return when it is due for another review.
 
 [Open LexiLoop](https://lexiloop-ali.vercel.app) · [Source repository](https://github.com/alinikan/LexiLoop)
 
@@ -18,6 +18,7 @@ The current deployment is a small private app hosted on Vercel, with real Supaba
 - [Gmail SMTP and email templates](#gmail-smtp-and-email-templates)
 - [OpenAI setup and generation](#openai-setup-and-generation)
 - [Optional Cambridge reference](#optional-cambridge-reference)
+- [New vocabulary tools and upgrade steps](#vocabulary-experience-recommendations-recall-and-everyday-use)
 - [Vercel deployment](#vercel-deployment)
 - [Testing](#testing)
 - [Post-deployment checklist](#post-deployment-checklist)
@@ -28,7 +29,7 @@ The current deployment is a small private app hosted on Vercel, with real Supaba
 
 An account starts with an empty personal wordbook and no invented progress. Signup requires email confirmation. Sign-in, sign-out, forgotten-password requests and password changes are supported.
 
-Choose a daily goal (five words by default, configurable from one to twenty). Fill it with any mix of personal words and suggestions. You can replace selected words until you start a lesson; starting locks that day's selection. Completed words save individually. Leaving an unfinished word restarts its exercises, and a session already open at midnight retains its original daily set.
+Choose a daily goal (five words by default, configurable from one to twenty). Preview an automatically recommended set, edit its words and size, and accept only what you want. Nothing is added just by previewing. You can also fill the set manually. Accepting a smaller/larger set changes today's goal only. Starting locks that day's selection. Questions and answers autosave after a brief pause; a saved session resumes across reloads and days. Completed words save individually.
 
 Each learning session includes discovery, meaning, context, synonym distinctions, typed recall, your own sentence, application and a confidence recap. Personal sentences are checked for the word's presence and self-assessed; the app does not send them to AI for grading. Review sessions use recall, context and confidence. Wrong answers bring a word back in ten minutes; successful reviews gradually increase the interval. Quick review covers up to five due words and full review up to thirty. You can also practice a learned word early.
 
@@ -66,7 +67,7 @@ The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreS
 | `tests/`                 | Unit, route, embedded database and browser tests                 |
 | `public/`                | PWA icons, service worker and offline page                       |
 
-Normal reads load the whole personal collection in pages of database results, but only the latest 31 daily sets and 100 review events. PostgreSQL computes lifetime totals without transferring the entire history. Settings offers a JSON export containing all personal history; this is a download, not a database backup or an import feature.
+Normal reads load the whole personal collection in pages of database results, but only the latest 31 daily sets and 100 review events, plus the original daily set of any older paused lesson. PostgreSQL computes lifetime totals without transferring the entire history. Settings offers a JSON export containing all personal history; this is a download, not a database backup or an import feature.
 
 Changes are validated on the server and committed together in a database transaction. A profile revision detects another tab changing the same account. Repeated completion requests are recognized by their event ID so a retry does not award progress twice. See [architecture](docs/architecture.md) and [review scheduling](docs/spaced-repetition.md) for implementation details.
 
@@ -213,7 +214,7 @@ npm run db:seed
 
 A **migration** is a versioned SQL file that creates or changes database structures. The runner holds a database lock so two migration processes do not apply the same file simultaneously. It records completed files in `public.lexiloop_migrations`, the **migration ledger**. Each file and its ledger entry commit together, or both roll back on failure. Re-running skips recorded files.
 
-The current files are `001_initial.sql` and `002_production.sql`. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
+The current files are `001_initial.sql`, `002_production.sql`, and `003_vocabulary_practice.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 003 adds private practice data to profiles and extends the existing atomic save function; it does not erase prior words or history. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
 
 The seed inserts exactly **20 original starter lessons** in a fresh database, with **20 meaning rows and 40 example rows**. It is safe to repeat: existing canonical lessons are preserved. A used database can contain more than twenty words because generated lessons are stored there too.
 
@@ -234,7 +235,7 @@ from pg_policies where schemaname = 'public'
 order by tablename, policyname;
 ```
 
-The ledger should list both migrations. All LexiLoop tables, including the ledger, should have row security enabled.
+The ledger should list all three migrations. All LexiLoop tables, including the ledger, should have row security enabled.
 
 ### Understand Row Level Security
 
@@ -519,3 +520,47 @@ Back up the database according to the importance of its data and test restoratio
 Choose **Show me how** in the optional invitation to enable the pocket guides. Each main page explains its goal and controls in short steps. Use **Next tip**, **Back tip**, or a step title to explore, and **Hide guide** to return to practice. **Got it, let’s try** closes the guide; **Open guide** replays it.
 
 Choose **No thanks** or **Turn off tips** to dismiss tutorials. Re-enable them in **Settings → Learning tips**. This preference is stored in this browser, not synced between accounts or devices; if browser storage is unavailable, it works for the current visit. The guides are optional, keyboard accessible, responsive, and use the current light/dark appearance without adding animation. They make no AI requests.
+
+## Vocabulary experience: recommendations, recall and everyday use
+
+### A recommended set you can edit
+
+On Today, choose **Preview my recommendations**. Saved priority words rank first, followed by saved personal vocabulary and words matching your interests and selected level. Ties rotate deterministically by date. Archived, learned and dismissed words are excluded. Recommendations use existing available cards and do not trigger paid generation. Due words remain in Review rather than being relabeled as new words.
+
+Select or deselect any word, then choose **Use these words**. The selected count (1–20) becomes today's goal without changing your usual goal. **Cancel changes** leaves the saved set alone. **Edit today’s set** remains available until starting. **Add a different word** opens the normal word-card flow. The starter pool is finite; if it runs out, add personal words. Recommendations are a convenience, never a mandatory curriculum.
+
+### Practice that responds to mistakes
+
+New words receive the full introduction and exercises. Completed sessions record correctness separately for meaning, context, distinction, typed recall and application. Reviews always begin with typed recall before revealing the answer. A skill with a mistake and fewer than 80% correct answers in its latest five measured attempts gets focused work: meaning questions, distinctions, application plus a personal sentence, or another recall attempt after context. These are exercises from the existing word card, not newly generated AI questions. As recent results improve, extra exercises drop away. Confidence still influences scheduling; it does not replace measured recall.
+
+### Resume a saved lesson or review
+
+The current question, selected answer, typed answer, feedback state, personal sentence and confidence autosave after a 400ms pause. Watch **Your place is saved**. The close control and ordinary in-app links flush pending answers before navigation. A failed save displays retry guidance; reconnect and choose **Retry save** before leaving. The browser is asked to warn on closing with unsaved changes, but abrupt device shutdown or a killed browser cannot be guaranteed to preserve unsaved keystrokes. There is no offline account write queue.
+
+Open Learn or Review and choose **Resume saved lesson/review**. Each account can hold one draft of each kind; starting a replacement requires explicitly discarding the old unfinished session. Discarding does not erase completed words. A saved lesson keeps its original daily set even if resumed after midnight, while practice activity is dated when completed. The final word result and the next word's checkpoint commit atomically. Account drafts live in Supabase; demo drafts live only in this browser. Another active device can cause a revision conflict, in which case reload rather than overwrite newer progress.
+
+### Capture a word before you forget it
+
+Today includes **Quick capture inbox**. Enter a word or expression and optionally paste the original sentence into Context. **Save to inbox** stores it immediately without calling AI or creating a dictionary card. Edit or remove captures later. **Build this word card** opens Add a word with your capture and context filled in. The capture is removed only after a new card is successfully saved. Captures of words already in the collection stay in the inbox until manually removed. Up to 100 captures are retained; the app asks you to clear space rather than silently deleting old entries.
+
+### Put several words into one real thought
+
+In **Use words together** on Today, choose two or three saved words and a situation from your life. Write a short message or thought, check the meanings, and reflect on whether you feel ready to use the words or want to revisit the wording. The presence check looks for the displayed word forms; it does not judge semantic correctness or grammar. A saved reflection does not increase recall accuracy, change the spaced-review schedule, or award XP. No AI request is made. The private practice journal retains up to 100 entries and supports explicit removal.
+
+### Progress backed by memory evidence
+
+Progress now separates active words saved, words recalled after a delay, correct delayed recall attempts, and words the user feels ready to use. Delayed recall means the first typed recall result in a completed review at least 24 hours after the previous practice. Same-day repetitions, confidence ratings and historical sessions without skill evidence are not counted. These counters persist with each word, so the 100-event dashboard window does not truncate them. A repeated recall after feedback does not replace the first attempt in this metric. Ready-to-use counts are explicitly self-reported from the retained practice journal, not verified conversational ability. Archived words are excluded from these cards. Resetting a review schedule retains measured history.
+
+### Contextual guidance
+
+Enable **Learning tips** in Settings or accept **Show me how**. Short tips appear alongside daily-set editing, capture, word-use practice, saved sessions, confidence ratings and memory evidence. **Got it** dismisses an individual tip in this browser. **Replay contextual tips** in Settings restores them. The page walkthroughs also explain the new flows. Users who turn tips off do not see contextual tips.
+
+### Upgrade and acceptance checks
+
+1. Back up your database using your existing operational process.
+2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm `003_vocabulary_practice.sql` is in the ledger.
+3. Run `npm run verify` and `npm run test:e2e` locally.
+4. Deploy the updated code to the existing project.
+5. With a real account, accept an edited recommendation, capture a word, and pause a lesson. Reopen it on another signed-in device and check the exact answer and position. Then verify word-use journal entries and export.
+
+Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 003 has been applied to your hosted project or replace a real cross-device acceptance check. No live database migration or deployment is performed just by editing this repository.

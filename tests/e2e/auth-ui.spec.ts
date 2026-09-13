@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { initialState } from '../../lib/domain';
+import { initialState, applyCommand } from '../../lib/domain';
 import { catalog } from '../../data/catalog';
 test('account forms handle confirmation, invalid credentials and reset requests on a narrow phone', async ({
   page,
@@ -63,7 +63,7 @@ test('account routes support login, recovery, password change and logout against
   await page.getByLabel('Password', { exact: true }).fill('long test passphrase');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/:4173\/$/);
-  await expect(page.getByRole('heading', { name: /A few words/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /A few words/, level: 1 })).toBeVisible();
   expect(
     (await context.cookies()).some(
       (c) => c.name.includes('auth-token') && c.httpOnly && c.sameSite === 'Lax',
@@ -122,4 +122,49 @@ test('account forms have labeled controls, keyboard focus and responsive error s
   ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('account-form.png'), fullPage: true });
+});
+
+test('account draft saves survive another page and failed writes show retry', async ({
+  page,
+  context,
+}) => {
+  // Same account state fixture is served to both pages; no browser-local lesson storage.
+  let state = initialState();
+  state.settings.onboarded = true;
+  state = applyCommand(state, { type: 'daily-plan', words: ['reluctant'] }, catalog);
+  let fail = false;
+  await context.route('**/api/state', async (route) => {
+    if (route.request().method() === 'POST') {
+      if (fail) return route.fulfill({ status: 503, json: { error: 'Fixture save unavailable' } });
+      const body = route.request().postDataJSON();
+      if (body.version !== state.version)
+        return route.fulfill({ status: 409, json: { error: 'Version conflict' } });
+      state = applyCommand(state, body.command, catalog);
+    }
+    return route.fulfill({ json: { state, catalog } });
+  });
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('learner@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('long test passphrase');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/:4173\/$/);
+  await page.goto('/learn');
+  await page.getByRole('button', { name: 'Start lesson', exact: true }).click();
+  await expect(page.locator('.session-save')).toContainText('Your place is saved');
+  fail = true;
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.locator('.answer-options button').first().click();
+  await expect(page.locator('.session-save')).toContainText('Not saved yet');
+  fail = false;
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(page.locator('.session-save')).toContainText('Your place is saved');
+  const second = await context.newPage();
+  await second.goto('/learn');
+  await second.getByRole('button', { name: 'Resume saved lesson', exact: true }).click();
+  await expect(second.locator('.answer-options button').first()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(await second.evaluate(() => localStorage.getItem('lexiloop-demo-v1'))).toBeNull();
+  await second.close();
 });

@@ -1,6 +1,8 @@
 'use client';
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { workspace } from '@/lib/practice';
 import { ArrowRight, Plus, Check, Sparkles } from 'lucide-react';
 import { useStore } from '../store';
 import { WordDetail } from './detail';
@@ -8,9 +10,11 @@ import type { Word } from '@/lib/ai/schemas';
 import { todaySet } from '@/lib/domain';
 export function AddWord() {
   const { state, generate, dispatch, busy, notify } = useStore();
-  const [input, setInput] = useState(''),
+  const params = useSearchParams();
+  const capture = workspace(state).inbox.find((c) => c.id === params.get('capture'));
+  const [input, setInput] = useState(capture?.word ?? ''),
     [note, setNote] = useState(''),
-    [context, setContext] = useState(''),
+    [context, setContext] = useState(capture?.context ?? ''),
     [tag, setTag] = useState(''),
     [priority, setPriority] = useState(false),
     [word, setWord] = useState<Word | null>(null),
@@ -40,6 +44,7 @@ export function AddWord() {
     if (
       !(await dispatch({
         type: 'save',
+        captureId: capture?.id,
         word: word.word,
         source: 'personal',
         note,
@@ -61,6 +66,12 @@ export function AddWord() {
           <p>Bring it here. We’ll help you make it yours.</p>
         </div>
       </div>
+      {capture && (
+        <p className="notice">
+          From your quick-capture inbox. This capture is removed only after you save the new word
+          card.
+        </p>
+      )}
       <div className="add-layout">
         <form className="panel word-form" onSubmit={build}>
           <label>
