@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Star, ArrowLeft, ArrowRight, Plus } from 'lucide-react';
 import { useStore } from '../store';
+import { ContextTip } from '../tutorial';
 import { WordDetail } from './detail';
 import type { SavedWord } from '@/lib/domain';
 function WordEditor({ saved, onClose }: { saved: SavedWord; onClose: () => void }) {
@@ -40,7 +41,28 @@ function WordEditor({ saved, onClose }: { saved: SavedWord; onClose: () => void 
             <input value={tag} onChange={(e) => setTag(e.target.value)} maxLength={40} />
           </label>
           {saved.sentence && <blockquote>Your sentence: {saved.sentence}</blockquote>}
+          <ContextTip id="remove-word" title="Keep a wordbook you want to use">
+            Remove a word to delete its saved notes and schedule. Past activity stays in your
+            history. Archive it instead if you may want to restore its notes later.
+          </ContextTip>
           <div className="inline-actions">
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={async () => {
+                if (
+                  window.confirm(
+                    `Remove ${saved.word} from My Words? Its notes and learning schedule will be deleted, and unfinished sessions containing it will close. Past activity remains. You can save the word again later.`,
+                  ) &&
+                  (await dispatch({ type: 'forget', word: saved.word }))
+                ) {
+                  notify('Word removed from My Words.');
+                  onClose();
+                }
+              }}
+            >
+              Remove from My Words
+            </button>
             <button
               className="button"
               disabled={busy}

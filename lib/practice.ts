@@ -17,6 +17,14 @@ export type SkillRecord = Partial<
   Record<Skill, { attempts: number; correct: number; recent: boolean[] }>
 >;
 export type SessionDraft = {
+  mixed?: {
+    queue: { index: number; step: Step }[];
+    cursor: number;
+    progress: Record<
+      string,
+      { evidence: Evidence[]; mistakes: number; sentence: string; confidence: number }
+    >;
+  };
   id: string;
   kind: 'learn' | 'review';
   day: string;
@@ -131,7 +139,12 @@ export function recommendations(
   return catalog
     .filter((w) => {
       const saved = state.words.find((s) => s.word === w.word);
-      return !saved?.archived && !saved?.schedule.firstLearned && !state.dismissed.includes(w.word);
+      return (
+        (saved || w.difficulty === state.settings.level) &&
+        !saved?.archived &&
+        !saved?.schedule.firstLearned &&
+        !state.dismissed.includes(w.word)
+      );
     })
     .toSorted((a, b) => score(b) - score(a) || hash(date + a.word) - hash(date + b.word))
     .map((w) => ({
@@ -170,5 +183,83 @@ export function memoryMetrics(state: State) {
         .flatMap((p) => p.words)
         .filter((name) => words.some((w) => w.word === name)),
     ).size,
+  };
+}
+
+/** Round-based interleaving keeps every word in the set and adds practice for weak skills. */
+export function createMixedSession(
+  state: State,
+  newWords: string[],
+  _kind: 'learn' | 'review',
+  day: string,
+  id: string,
+  eventId: string,
+): SessionDraft {
+  const words = [
+    ...new Set([
+      ...newWords,
+      ...state.words.filter((w) => !w.archived && w.schedule.firstLearned).map((w) => w.word),
+    ]),
+  ];
+  const draft = createSession(state, words, 'learn', day, id, eventId);
+  const queue: { index: number; step: Step }[] = newWords.map((name) => ({
+    index: words.indexOf(name),
+    step: 'Discover',
+  }));
+  const rounds = words.map((name) =>
+    newWords.includes(name)
+      ? [...lessonSteps.filter((s) => s !== 'Discover')]
+      : practiceSteps(
+          'review',
+          state.words.find((w) => w.word === name),
+        ),
+  );
+  let seed = [...id].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 1);
+  const random = () => {
+    seed = (1664525 * seed + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  while (rounds.some((r) => r.length)) {
+    const indices = rounds.flatMap((r, i) => (r.length ? [i] : []));
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    for (const index of indices) queue.push({ index, step: rounds[index].shift()! });
+  }
+  draft.mixed = { queue, cursor: 0, progress: {} };
+  draft.index = queue[0].index;
+  draft.steps = [queue[0].step];
+  return draft;
+}
+export function advanceMixed(draft: SessionDraft): SessionDraft | null {
+  const mixed = draft.mixed!;
+  const cursor = mixed.cursor + 1;
+  const task = mixed.queue[cursor];
+  if (!task) return null;
+  const progress = {
+    ...mixed.progress,
+    [draft.words[draft.index]]: {
+      evidence: draft.evidence,
+      mistakes: draft.mistakes,
+      sentence: draft.sentence,
+      confidence: draft.confidence,
+    },
+  };
+  const next = progress[draft.words[task.index]];
+  return {
+    ...draft,
+    mixed: { ...mixed, cursor, progress },
+    index: task.index,
+    step: 0,
+    steps: [task.step],
+    evidence: next?.evidence ?? [],
+    mistakes: next?.mistakes ?? 0,
+    sentence: next?.sentence ?? '',
+    confidence: next?.confidence ?? 2,
+    text: '',
+    answer: null,
+    checked: false,
+    eventId: crypto.randomUUID(),
   };
 }

@@ -3,12 +3,15 @@ import { useState, useRef, useEffect, type SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createSession,
+  createMixedSession,
+  advanceMixed,
   workspace,
   practiceSteps,
   stepSkill,
   weakSkills,
   type SessionDraft,
 } from '@/lib/practice';
+import { ScreenScene } from '../words/screen-scene';
 import { ContextTip } from '../tutorial';
 import { ArrowRight, Check, Volume2, Lightbulb, Trophy, X } from 'lucide-react';
 import { useStore } from '../store';
@@ -28,9 +31,15 @@ export function Session({
   const [draft, setDraft] = useState<SessionDraft>(
     () =>
       workspace(state).sessions[kind] ??
-      createSession(
+      (kind === 'learn' ? createMixedSession : createSession)(
         state,
-        words.map((w) => w.word),
+        words
+          .filter(
+            (w) =>
+              kind !== 'learn' ||
+              !state.words.find((s) => s.word === w.word)?.schedule.firstLearned,
+          )
+          .map((w) => w.word),
         kind,
         todaySet(state).date,
         crypto.randomUUID(),
@@ -149,8 +158,8 @@ export function Session({
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     card.current?.focus();
-  }, [step, index]);
-  const word = words[index];
+  }, [step, index, draft.mixed?.cursor]);
+  const word = words.find((w) => w.word === draft.words[index])!;
   const activeSteps = draft.steps;
   const current = activeSteps[step];
   const exercise = word.exercises.find(
@@ -187,14 +196,20 @@ export function Session({
     }));
   }
   async function next() {
+    if (draft.mixed && current !== 'Recap') {
+      const next = advanceMixed(draft);
+      if (next) setDraft(next);
+      return;
+    }
     if (step === activeSteps.length - 1) {
       finalizing.current = true;
       if (!(await savePlace())) {
         finalizing.current = false;
         return;
       }
-      const nextDraft: SessionDraft | null =
-        index === words.length - 1
+      const nextDraft: SessionDraft | null = draft.mixed
+        ? advanceMixed(draft)
+        : index === words.length - 1
           ? null
           : {
               ...draft,
@@ -221,7 +236,12 @@ export function Session({
           quality,
           confidence,
           day: kind === 'learn' ? draft.day : undefined,
-          kind,
+          kind:
+            kind === 'learn' &&
+            !!state.words.find((w) => w.word === word.word)?.schedule.firstLearned
+              ? 'review'
+              : kind,
+          sessionKind: kind,
           sentence,
           id: draft.eventId,
           evidence: draft.evidence,
@@ -252,7 +272,19 @@ export function Session({
         <h1>{kind === 'learn' ? 'These words are yours.' : 'Another loop, a little stronger.'}</h1>
         <p>
           You practiced {words.length} {words.length === 1 ? 'word' : 'words'} and earned{' '}
-          {words.length * (kind === 'learn' ? 20 : 10)} XP.
+          {words.reduce(
+            (n, w) =>
+              n +
+              (kind === 'learn' &&
+              (!draft.mixed ||
+                draft.mixed.queue.some(
+                  (task) => task.step === 'Discover' && draft.words[task.index] === w.word,
+                ))
+                ? 20
+                : 10),
+            0,
+          )}{' '}
+          XP.
         </p>
         <p>Your next reviews are scheduled. Words that felt tricky will return sooner.</p>
         <div className="word-chips">
@@ -295,6 +327,28 @@ export function Session({
             answers. Recall still comes first.
           </p>
         )}
+      {draft.mixed && (
+        <p className="notice">
+          {current === 'Discover'
+            ? 'Meet every new word first. Mixed exercises come next.'
+            : `Mixed practice · ${words.length} words, including earlier lessons. Tricky skills get extra practice.`}
+        </p>
+      )}
+      {draft.mixed && (
+        <ContextTip
+          key={current === 'Discover' ? 'teach-first' : 'mixed-practice'}
+          id={current === 'Discover' ? 'teach-first' : 'mixed-practice'}
+          title={
+            current === 'Discover'
+              ? 'Meet the words before testing yourself'
+              : 'Connect your growing vocabulary'
+          }
+        >
+          {current === 'Discover'
+            ? 'Read the meaning and examples for every new word first. Open the mini-scene for another way to picture it.'
+            : 'Exercises switch between your new and previously learned words. Recent mistakes add targeted questions. You can pause at any point; the same order and answers will resume.'}
+        </ContextTip>
+      )}
       <div className="lesson-top">
         <button
           className="icon-button"
@@ -310,13 +364,13 @@ export function Session({
           className="progress-track"
           role="progressbar"
           aria-label="Lesson progress"
-          aria-valuenow={index * activeSteps.length + step}
+          aria-valuenow={draft.mixed?.cursor ?? index * activeSteps.length + step}
           aria-valuemin={0}
-          aria-valuemax={words.length * activeSteps.length}
+          aria-valuemax={draft.mixed?.queue.length ?? words.length * activeSteps.length}
         >
           <span
             style={{
-              width: `${((index * activeSteps.length + step) / (words.length * activeSteps.length)) * 100}%`,
+              width: `${((draft.mixed?.cursor ?? index * activeSteps.length + step) / (draft.mixed?.queue.length ?? words.length * activeSteps.length)) * 100}%`,
             }}
           />
         </div>
@@ -351,6 +405,7 @@ export function Session({
             </p>
             <p className="definition">{word.meanings[0].definition}</p>
             <blockquote>{word.meanings[0].examples[0]}</blockquote>
+            <ScreenScene word={word} />
             <div className="memory-hook">
               <Lightbulb size={23} />
               <p>{word.meanings[0].simple}</p>
@@ -514,7 +569,7 @@ export function Session({
             }
             onClick={() => void next()}
           >
-            {step === activeSteps.length - 1 ? 'Save & continue' : 'Continue'}
+            {current === 'Recap' ? 'Save & continue' : 'Continue'}
             <ArrowRight size={18} />
           </button>
         )}

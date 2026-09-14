@@ -36,7 +36,7 @@ export function Learn() {
         {today.words.length < today.goal
           ? `Choose ${today.goal - today.words.length} more words to build your daily set.`
           : remaining.length
-            ? 'Discover the meaning, explore real situations, and put each word into your own sentence.'
+            ? 'First meet all your new words. Then mix exercises with every active word you have learned, with extra practice for tricky skills. Pause and resume whenever you like.'
             : 'You can keep practicing in Review.'}
       </p>
       <div className="word-chips">
@@ -55,7 +55,16 @@ export function Learn() {
           disabled={busy}
           onClick={async () => {
             if (today.started || (await dispatch({ type: 'start' })))
-              setWords(remaining.map((w) => catalog.find((c) => c.word === w)!));
+              setWords(
+                [
+                  ...new Set([
+                    ...remaining,
+                    ...state.words
+                      .filter((w) => !w.archived && w.schedule.firstLearned)
+                      .map((w) => w.word),
+                  ]),
+                ].map((w) => catalog.find((c) => c.word === w)!),
+              );
           }}
         >
           {today.started ? 'Continue lesson' : 'Start lesson'}

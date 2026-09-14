@@ -31,11 +31,11 @@ An account starts with an empty personal wordbook and no invented progress. Sign
 
 Choose a daily goal (five words by default, configurable from one to twenty). Preview an automatically recommended set, edit its words and size, and accept only what you want. Nothing is added just by previewing. You can also fill the set manually. Accepting a smaller/larger set changes today's goal only. Starting locks that day's selection. Questions and answers autosave after a brief pause; a saved session resumes across reloads and days. Completed words save individually.
 
-Each learning session includes discovery, meaning, context, synonym distinctions, typed recall, your own sentence, application and a confidence recap. Personal sentences are checked for the word's presence and self-assessed; the app does not send them to AI for grading. Review sessions use recall, context and confidence. Wrong answers bring a word back in ten minutes; successful reviews gradually increase the interval. Quick review covers up to five due words and full review up to thirty. You can also practice a learned word early.
+New learning sessions first introduce every selected new word, then interleave exercises across those words and every active previously learned word. Exercises cover meaning, context, distinctions, typed recall, personal sentences, application and confidence; earlier words receive recall and context plus extra tasks for weak skills. Existing saved sessions retain their original flow until finished or discarded. Personal sentences are checked for the word's presence and self-assessed; the app does not send them to AI for grading. Review sessions use recall, context and confidence. Wrong answers bring a word back in ten minutes; successful reviews gradually increase the interval. Quick review covers up to five due words and full review up to thirty. You can also practice a learned word early.
 
-The wordbook supports notes, original context, tags, priority, favorites, search, filters, archiving and schedule reset. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
+The wordbook supports notes, original context, tags, priority, favorites, search, filters, removal, archiving and schedule reset. Remove from My Words deletes that saved word’s notes and schedule, closes affected unfinished sessions, and adjusts an unfinished active daily set. Past activity and shared teaching content remain. Archive is the reversible alternative. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
 
-Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions rank the available catalog by usefulness, level and interests; they are not an unlimited AI recommendation feed. Twenty pre-written starter lessons provide initial material. Saved custom lessons expand a learner's available content.
+Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions filter unsaved words to the selected level, then rank by usefulness and interests. Search finds both Suggested and My Saved Words across all levels, including learned words. Browsing loads 24 cards at a time. The library contains 400 original lessons: 38 A2, 55 B1, 109 B2 and 198 C1. These are editorial difficulty estimates, not certified CEFR ratings. This is a curated learning library, not a complete dictionary or an unlimited AI recommendation feed. Saved custom lessons expand a learner's available content.
 
 Install the website on your Home Screen through your browser. Public assets and a reconnect page work offline; already loaded words remain readable while open. Account changes require a connection. Reminders appear inside the app; the notification control sends an immediate permission test, not scheduled background push. Device pronunciation uses the browser's voice, separate from optional Cambridge audio.
 
@@ -52,20 +52,20 @@ Supabase Auth → Gmail SMTP → verification and recovery emails
 
 The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreSQL, the OpenAI SDK, Zod validation, Vitest and Playwright. Node 24 is the recommended runtime. Exact dependency versions come from `package-lock.json`.
 
-| Location                 | Responsibility                                                   |
-| ------------------------ | ---------------------------------------------------------------- |
-| `app/`                   | Pages, authenticated API routes and email callback               |
-| `components/`            | Learning interface, account forms and client state               |
-| `lib/domain.ts`          | Daily-set rules and commands that change learning state          |
-| `lib/spaced-repetition/` | Review scheduling                                                |
-| `lib/db/`                | Verified users, private reads and authorized database writes     |
-| `lib/ai/`                | Lesson schema, original-content prompt and provider              |
-| `lib/dictionary/`        | Separate optional Cambridge integration                          |
-| `data/catalog.ts`        | Twenty original starter lessons                                  |
-| `supabase/migrations/`   | Versioned SQL schema, policies and functions                     |
-| `scripts/`               | Database setup, configuration checks and isolated test launchers |
-| `tests/`                 | Unit, route, embedded database and browser tests                 |
-| `public/`                | PWA icons, service worker and offline page                       |
+| Location                 | Responsibility                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `app/`                   | Pages, authenticated API routes and email callback                                    |
+| `components/`            | Learning interface, account forms and client state                                    |
+| `lib/domain.ts`          | Daily-set rules and commands that change learning state                               |
+| `lib/spaced-repetition/` | Review scheduling                                                                     |
+| `lib/db/`                | Verified users, private reads and authorized database writes                          |
+| `lib/ai/`                | Lesson schema, original-content prompt and provider                                   |
+| `lib/dictionary/`        | Separate optional Cambridge integration                                               |
+| `data/catalog.ts`        | Original starter lessons plus `data/expanded.ts` and `data/more-words.ts` (400 total) |
+| `supabase/migrations/`   | Versioned SQL schema, policies and functions                                          |
+| `scripts/`               | Database setup, configuration checks and isolated test launchers                      |
+| `tests/`                 | Unit, route, embedded database and browser tests                                      |
+| `public/`                | PWA icons, service worker and offline page                                            |
 
 Normal reads load the whole personal collection in pages of database results, but only the latest 31 daily sets and 100 review events, plus the original daily set of any older paused lesson. PostgreSQL computes lifetime totals without transferring the entire history. Settings offers a JSON export containing all personal history; this is a download, not a database backup or an import feature.
 
@@ -158,7 +158,7 @@ For a quick interface preview before configuring services:
 npm run dev:demo
 ```
 
-This explicitly enables a local **demo mode**: no real accounts, no paid AI calls, and only the twenty starter lessons. Practice is stored in this browser's local storage and does not transfer to a real account. A **mock provider** means a local stand-in that returns starter content instead of contacting OpenAI. Production builds disable both demo mode and mock generation so a deployed account app cannot accidentally save users' progress only on their device.
+This explicitly enables a local **demo mode**: no real accounts, no paid AI calls, and the 400 original library lessons. Practice is stored in this browser's local storage and does not transfer to a real account. A **mock provider** means a local stand-in that returns starter content instead of contacting OpenAI. Production builds disable both demo mode and mock generation so a deployed account app cannot accidentally save users' progress only on their device.
 
 ## Environment variables
 
@@ -214,7 +214,7 @@ npm run db:seed
 
 A **migration** is a versioned SQL file that creates or changes database structures. The runner holds a database lock so two migration processes do not apply the same file simultaneously. It records completed files in `public.lexiloop_migrations`, the **migration ledger**. Each file and its ledger entry commit together, or both roll back on failure. Re-running skips recorded files.
 
-The current files are `001_initial.sql`, `002_production.sql`, and `003_vocabulary_practice.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 003 adds private practice data to profiles and extends the existing atomic save function; it does not erase prior words or history. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
+The current files are `001_initial.sql`, `002_production.sql`, `003_vocabulary_practice.sql`, and `004_remove_saved_words.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 003 adds private practice data. Migration 004 extends the atomic save function to remove only the requesting account’s selected saved words. Applying either migration does not delete existing progress. Run `npm run db:seed` as well: the expanded library must exist in the shared database before users save its new words. Seeding inserts missing entries and preserves existing cards. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
 
 The seed inserts exactly **20 original starter lessons** in a fresh database, with **20 meaning rows and 40 example rows**. It is safe to repeat: existing canonical lessons are preserved. A used database can contain more than twenty words because generated lessons are stored there too.
 
@@ -558,9 +558,17 @@ Enable **Learning tips** in Settings or accept **Show me how**. Short tips appea
 ### Upgrade and acceptance checks
 
 1. Back up your database using your existing operational process.
-2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm `003_vocabulary_practice.sql` is in the ledger.
+2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm `003_vocabulary_practice.sql` and `004_remove_saved_words.sql` are in the ledger, then run `npm run db:seed`.
 3. Run `npm run verify` and `npm run test:e2e` locally.
 4. Deploy the updated code to the existing project.
 5. With a real account, accept an edited recommendation, capture a word, and pause a lesson. Reopen it on another signed-in device and check the exact answer and position. Then verify word-use journal entries and export.
 
 Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 003 has been applied to your hosted project or replace a real cross-device acceptance check. No live database migration or deployment is performed just by editing this repository.
+
+### Mixed lessons, search, and original scenes
+
+A new daily lesson introduces the whole selected set before testing. For example, ten active learned words plus five new words produce practice for all fifteen. Exercise rounds shuffle word order, while preserving each word's teaching sequence. Recent mistakes add targeted exercises for earlier words. Each completed word updates its own schedule and evidence once; the next checkpoint commits in the same transaction. The full task order, per-word answers, personal sentences, and position survive reloads and midnight. Older saved lesson formats remain readable. Longer sessions can be paused; they are not truncated to the separate Review page's thirty-word batch.
+
+Search ignores the source tab, category and level while text is entered, so a specific saved or suggested word remains findable. Clear the search to return to browsing filters. Saved priorities can still be recommended outside the selected difficulty because the learner explicitly chose them. Existing saved cards retain their stored explanations when a library update introduces the same spelling.
+
+Word details and the introduction phase include an expandable **original mini-scene**, a meaning explanation, and a situation to connect to daily conversation. Many expanded examples use fictional comedy, mystery, or adventure settings. They are not quotations from Friends, The Office, It's Always Sunny, or any existing film or game. No licensed screen-dialogue collection or new dictionary integration is included. Contextual tips explain search, mixed practice, and removal when those controls appear, following the user's existing tips preference.

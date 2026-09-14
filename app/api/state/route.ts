@@ -20,11 +20,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    if (Number(request.headers.get('content-length')) > 16000)
+    if (Number(request.headers.get('content-length')) > 8000000)
       throw new UserError('This request is too large.');
     const body = z
       .object({ version: z.number().int().nonnegative(), command: z.unknown() })
-      .parse(await readJson(request));
+      .parse(await readJson(request, 8000000));
     const command = commandSchema.parse(body.command);
     const current = await readState();
     if (body.version !== current.state.version)

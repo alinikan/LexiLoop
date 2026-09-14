@@ -1,4 +1,5 @@
 'use client';
+import { ScreenScene } from './screen-scene';
 import { CambridgeSection } from './cambridge';
 import { Volume2, Lightbulb } from 'lucide-react';
 import type { Word } from '@/lib/ai/schemas';
@@ -56,6 +57,7 @@ export function WordDetail({ word }: { word: Word }) {
           ))}
         </section>
       ))}
+      <ScreenScene word={word} />
       <section>
         <h3>Picture this</h3>
         <p>{word.scenario}</p>
@@ -70,21 +72,23 @@ export function WordDetail({ word }: { word: Word }) {
           <p>{word.commonMistake}</p>
         </section>
       </div>
-      <section>
-        <h3>Close, but different</h3>
-        {word.synonyms.map((s) => (
-          <p key={s.word}>
-            <strong>
-              {word.word} / {s.word}
-            </strong>
-            <br />
-            {s.distinction}
-          </p>
-        ))}
-      </section>
+      {word.synonyms.length > 0 && (
+        <section>
+          <h3>Close, but different</h3>
+          {word.synonyms.map((s) => (
+            <p key={s.word}>
+              <strong>
+                {word.word} / {s.word}
+              </strong>
+              <br />
+              {s.distinction}
+            </p>
+          ))}
+        </section>
+      )}
       <div className="detail-columns">
         <section>
-          <h3>Common combinations</h3>
+          {word.collocations.length > 0 && <h3>Common combinations</h3>}
           {word.collocations.map((c) => (
             <p key={c}>{c}</p>
           ))}

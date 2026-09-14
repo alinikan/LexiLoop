@@ -2,31 +2,29 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Check, Bookmark, X, Search, ArrowRight } from 'lucide-react';
+import { ContextTip } from '../tutorial';
 import { useStore } from '../store';
 import { todaySet } from '@/lib/domain';
 export function Discover() {
   const { state, catalog, dispatch, busy, notify } = useStore();
   const [filter, setFilter] = useState('For you'),
     [query, setQuery] = useState(''),
-    [tab, setTab] = useState('Suggested');
+    [tab, setTab] = useState('Suggested'),
+    [limit, setLimit] = useState(24);
   const today = todaySet(state);
   const levels = ['A2', 'B1', 'B2', 'C1'];
   const words = catalog
-    .filter(
-      (w) =>
+    .filter((w) => {
+      const saved = state.words.find((s) => s.word === w.word);
+      if (query.trim()) return w.word.includes(query.trim().toLowerCase());
+      return (
         !state.dismissed.includes(w.word) &&
-        (!query || w.word.includes(query.toLowerCase())) &&
         (filter === 'For you' || w.categories.includes(filter)) &&
         (tab === 'My saved words'
-          ? state.words.some(
-              (s) =>
-                s.word === w.word &&
-                !s.archived &&
-                !s.schedule.firstLearned &&
-                !today.words.includes(w.word),
-            )
-          : !state.words.some((s) => s.word === w.word)),
-    )
+          ? !!saved && !saved.archived && !today.words.includes(w.word)
+          : !saved && w.difficulty === state.settings.level)
+      );
+    })
     .sort((a, b) => {
       const rank = (w: typeof a) =>
         w.usefulness +
@@ -80,6 +78,11 @@ export function Discover() {
           <ArrowRight size={18} />
         </Link>
       </div>
+      <ContextTip id="combined-search" title="One search for your whole vocabulary">
+        Search finds suggested and saved words together, at every level. Clear the search to browse
+        your chosen level, or open My saved words. Change Vocabulary level in Settings for different
+        suggestions.
+      </ContextTip>
       <div className="toolbar">
         <div className="segmented" aria-label="Word source">
           {['Suggested', 'My saved words'].map((t) => (
@@ -92,9 +95,12 @@ export function Discover() {
           <Search size={19} />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setLimit(24);
+            }}
             placeholder="Find a word"
-            aria-label="Find a suggested word"
+            aria-label="Find a word across suggested and saved words"
           />
         </label>
       </div>
@@ -111,12 +117,20 @@ export function Discover() {
           ),
         )}
       </div>
+      <p className="notice" role="status">
+        {query.trim()
+          ? 'Searching Suggested and My Saved Words, across every level.'
+          : tab === 'Suggested'
+            ? `Showing ${state.settings.level} words. Change your level in Settings.`
+            : 'Your saved words, across every level.'}{' '}
+        {words.length} results in a library of {catalog.length} words.
+      </p>
       <div className="discovery-grid">
-        {words.map((word, i) => (
+        {words.slice(0, limit).map((word, i) => (
           <article className="discovery-card" key={word.word}>
             <div className="card-top">
               <span className={'category color-' + (i % 4)}>{word.categories[0]}</span>
-              {tab === 'Suggested' && (
+              {!state.words.some((s) => s.word === word.word) && (
                 <button
                   className="icon-button"
                   disabled={busy}
@@ -128,6 +142,14 @@ export function Discover() {
               )}
             </div>
             <h2>{word.word}</h2>
+            {state.words.some((s) => s.word === word.word) && (
+              <Link
+                className="text-link"
+                href={`/collection?word=${encodeURIComponent(word.word)}`}
+              >
+                In My Saved Words
+              </Link>
+            )}
             <span className="word-meta">
               {word.partOfSpeech} <span>·</span> {word.difficulty} <span>·</span> Highly useful
             </span>
@@ -135,13 +157,21 @@ export function Discover() {
             <div className="card-actions">
               <button
                 className="button secondary"
-                disabled={busy || today.started || today.words.length >= today.goal}
+                disabled={
+                  busy ||
+                  today.started ||
+                  today.words.length >= today.goal ||
+                  today.words.includes(word.word) ||
+                  state.words.some(
+                    (s) => s.word === word.word && (s.archived || !!s.schedule.firstLearned),
+                  )
+                }
                 onClick={() => void add(word.word, true)}
               >
                 {today.words.includes(word.word) ? <Check size={17} /> : <Plus size={17} />}Add to
                 today
               </button>
-              {tab === 'Suggested' && (
+              {!state.words.some((s) => s.word === word.word) && (
                 <button
                   className="icon-button bookmark"
                   disabled={busy}
@@ -155,6 +185,11 @@ export function Discover() {
           </article>
         ))}
       </div>
+      {words.length > limit && (
+        <button className="button secondary" onClick={() => setLimit(limit + 24)}>
+          Show more words
+        </button>
+      )}
       {!words.length && (
         <div className="empty-state">
           <Search size={32} />

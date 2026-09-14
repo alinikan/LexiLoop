@@ -37,7 +37,7 @@ export const commandSchema = z.discriminatedUnion('type', [
     toToday: z.boolean().optional(),
     captureId: z.uuid().optional(),
   }),
-  ...(['select', 'remove', 'dismiss', 'reset'] as const).map((type) =>
+  ...(['select', 'remove', 'dismiss', 'reset', 'forget'] as const).map((type) =>
     z.object({ type: z.literal(type), word }),
   ),
   z.object({ type: z.literal('start') }),
@@ -45,6 +45,7 @@ export const commandSchema = z.discriminatedUnion('type', [
     type: z.literal('complete'),
     evidence: evidenceSchema.optional(),
     nextSession: sessionSchema.nullable().optional(),
+    sessionKind: z.enum(['learn', 'review']).optional(),
     word,
     quality: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
     confidence: z.number().int().min(0).max(4).optional(),

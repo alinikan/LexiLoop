@@ -1,3 +1,4 @@
+import { expandedCatalog } from './expanded';
 import { validateWord, type Word } from '@/lib/ai/schemas';
 // Original editorial content. No dictionary text or scraped definitions.
 type Entry = [
@@ -338,7 +339,7 @@ const entries: Entry[] = [
     'anticipate + noun / -ing',
   ],
 ];
-export const catalog: Word[] = entries.map(
+const originalCatalog: Word[] = entries.map(
   (
     [
       word,
@@ -425,6 +426,10 @@ export const catalog: Word[] = entries.map(
       ],
     }),
 );
+export const catalog: Word[] = [
+  ...originalCatalog,
+  ...expandedCatalog.filter((w) => !originalCatalog.some((o) => o.word === w.word)),
+];
 export const achievements = [
   {
     id: 'first5',

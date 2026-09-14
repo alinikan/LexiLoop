@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { mergeCatalog } from '@/lib/catalog';
 import { catalog as seed } from '@/data/catalog';
 import { initialState, applyCommand, type State, type Command } from '@/lib/domain';
 import { type Word, validateWord } from '@/lib/ai/schemas';
@@ -55,7 +56,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ) {
             current.current = parsed.state;
             setState(parsed.state);
-            setCatalog(parsed.catalog.map(validateWord));
+            setCatalog(mergeCatalog(seed, parsed.catalog.map(validateWord)));
           }
         } else {
           const fresh = initialState();
@@ -151,11 +152,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           throw new Error(
             'You’re offline. You can read loaded words; reconnect before saving progress.',
           );
+        const body = JSON.stringify({ version: current.current.version, command });
         const res = await fetch('/api/state', {
           method: 'POST',
-          keepalive: command.type === 'checkpoint',
+          // Browsers cap keepalive request bodies at 64 KiB. Larger saved sessions use a normal request.
+          keepalive: command.type === 'checkpoint' && new TextEncoder().encode(body).length < 60000,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ version: current.current.version, command }),
+          body,
         });
         const data = await res.json();
         if (res.status === 401) {
@@ -190,7 +193,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (existing && demoMode) return existing;
     if (demoMode)
       throw new Error(
-        'Demo mode includes 20 curated words. Try “reluctant”, “feasible”, or “clarify”. Configure live AI for other words.',
+        `Demo mode includes ${seed.length} curated words. Try “reluctant”, “feasible”, or “clarify”. Configure live AI for other words.`,
       );
     if (!navigator.onLine)
       throw new Error('Reconnect to build a new word. Your input is still here.');

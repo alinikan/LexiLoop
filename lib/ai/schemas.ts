@@ -30,11 +30,11 @@ export const wordSchema = z.object({
   commonMistake: z.string().min(5).max(400),
   synonyms: z
     .array(z.object({ word: z.string().max(60), distinction: z.string().min(5).max(400) }))
-    .min(1)
+    .min(0)
     .max(4),
   antonyms: z.array(z.string().max(80)).max(5),
   family: z.array(z.string().max(80)).max(8),
-  collocations: z.array(z.string().max(120)).min(1).max(5),
+  collocations: z.array(z.string().max(120)).min(0).max(5),
   patterns: z.array(z.string().max(150)).min(1).max(4),
   memoryHook: z.string().min(5).max(400),
   exercises: z.array(exerciseSchema).min(4).max(8),

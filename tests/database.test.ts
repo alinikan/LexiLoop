@@ -24,14 +24,19 @@ afterAll(async () => {
 });
 it('migrates and seeds canonical content with normalized meanings and examples', async () => {
   expect((await db.query('select count(*)::int as count from words')).rows).toEqual([
-    { count: 20 },
+    { count: catalog.length },
   ]);
   expect((await db.query('select count(*)::int as count from word_examples')).rows).toEqual([
-    { count: 40 },
+    {
+      count: catalog.reduce(
+        (n, w) => n + w.meanings.reduce((m, meaning) => m + meaning.examples.length, 0),
+        0,
+      ),
+    },
   ]);
   await db.query('select public.cache_lexical_word($1::jsonb)', [JSON.stringify(catalog[0])]);
   expect((await db.query('select count(*)::int as count from words')).rows).toEqual([
-    { count: 20 },
+    { count: catalog.length },
   ]);
 });
 it('commits normalized daily data atomically and rejects stale revisions', async () => {
@@ -189,6 +194,7 @@ it('records migrations in the ledger and safely skips a second run', async () =>
     { name: '001_initial.sql' },
     { name: '002_production.sql' },
     { name: '003_vocabulary_practice.sql' },
+    { name: '004_remove_saved_words.sql' },
   ]);
   expect(await migrate(migrationClient())).toEqual([]);
   expect(
@@ -296,4 +302,76 @@ it('saves private drafts and captures atomically with existing revisions and exp
     (await db.query<{ workspace: unknown }>('select workspace from profiles where id=$1', [user]))
       .rows[0].workspace,
   ).toEqual(state.workspace);
+});
+
+it('removes only the owner’s saved word atomically and retains review history', async () => {
+  const otherRevision =
+    (await db.query<{ revision: number }>('select revision from profiles where id=$1', [other]))
+      .rows[0]?.revision ?? 0;
+  const otherState = applyCommand(
+    initialState(),
+    { type: 'save', word: 'reluctant', source: 'personal' },
+    catalog,
+  );
+  otherState.version = otherRevision + 1;
+  await db.query('select commit_learning_state($1,$2,$3::jsonb)', [
+    other,
+    otherRevision,
+    JSON.stringify(otherState),
+  ]);
+  const revision = (
+    await db.query<{ revision: number }>('select revision from profiles where id=$1', [user])
+  ).rows[0].revision;
+  const count = (
+    await db.query<{ n: number }>('select count(*)::int n from review_events where user_id=$1', [
+      user,
+    ])
+  ).rows[0].n;
+  const payload = { ...initialState(), version: revision + 1, removed_words: ['reluctant'] };
+  await expect(
+    db.query('select commit_learning_state($1,$2,$3::jsonb)', [
+      user,
+      revision - 1,
+      JSON.stringify(payload),
+    ]),
+  ).rejects.toThrow('revision_conflict');
+  expect(
+    (
+      await db.query('select word from user_words where user_id=$1 and word=$2', [
+        user,
+        'reluctant',
+      ])
+    ).rows,
+  ).toHaveLength(1);
+  await db.query('select commit_learning_state($1,$2,$3::jsonb)', [
+    user,
+    revision,
+    JSON.stringify(payload),
+  ]);
+  expect(
+    (
+      await db.query('select word from user_words where user_id=$1 and word=$2', [
+        user,
+        'reluctant',
+      ])
+    ).rows,
+  ).toHaveLength(0);
+  expect(
+    (
+      await db.query<{ n: number }>('select count(*)::int n from review_events where user_id=$1', [
+        user,
+      ])
+    ).rows[0].n,
+  ).toBe(count);
+  expect((await db.query('select word from words where word=$1', ['reluctant'])).rows).toHaveLength(
+    1,
+  );
+  expect(
+    (
+      await db.query('select word from user_words where user_id=$1 and word=$2', [
+        other,
+        'reluctant',
+      ])
+    ).rows,
+  ).toHaveLength(1);
 });

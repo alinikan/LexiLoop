@@ -85,6 +85,7 @@ export type Command =
       text: string;
       reflection: 'ready' | 'revisit';
     }
+  | { type: 'forget'; word: string }
   | { type: 'settings'; settings: Settings }
   | {
       type: 'save';
@@ -103,6 +104,7 @@ export type Command =
       type: 'complete';
       evidence?: Evidence[];
       nextSession?: SessionDraft | null;
+      sessionKind?: 'learn' | 'review';
       word: string;
       quality: 0 | 1 | 2 | 3;
       confidence?: number;
@@ -212,6 +214,29 @@ export function applyCommand(
       today.goal = command.words.length;
       break;
     }
+    case 'forget': {
+      lookup(command.word);
+      state.words = state.words.filter((w) => w.word !== command.word);
+      for (const day of state.days) {
+        if (
+          (day.date === date || day.date === state.workspace.sessions.learn?.day) &&
+          day.words.includes(command.word) &&
+          !day.completed.includes(command.word)
+        ) {
+          day.words = day.words.filter((w) => w !== command.word);
+          if (day.started) day.goal = day.words.length;
+          if (!day.words.length) {
+            day.started = false;
+            day.goal = state.settings.goal;
+          }
+        }
+      }
+      for (const kind of ['learn', 'review'] as const) {
+        if (state.workspace.sessions[kind]?.words.includes(command.word))
+          delete state.workspace.sessions[kind];
+      }
+      break;
+    }
     case 'checkpoint': {
       const draft = command.draft;
       for (const name of draft.words) {
@@ -221,9 +246,14 @@ export function applyCommand(
       }
       if (draft.kind === 'learn') {
         const day = state.days.find((d) => d.date === draft.day);
-        if (!day?.started || draft.words.some((w) => !day.words.includes(w)))
+        if (
+          !day?.started ||
+          draft.words.some(
+            (w) => !day.words.includes(w) && !(draft.mixed && lookup(w).schedule.firstLearned),
+          )
+        )
           throw new UserError('This daily session is no longer available.');
-        if (day.completed.includes(draft.words[draft.index]))
+        if (!draft.mixed && day.completed.includes(draft.words[draft.index]))
           throw new UserError('This word was already completed. Reload to continue.');
       }
       const old = state.workspace.sessions[draft.kind];
@@ -384,14 +414,14 @@ export function applyCommand(
       if (command.nextSession !== undefined) {
         if (command.nextSession) {
           if (
-            command.nextSession.kind !== command.kind ||
+            command.nextSession.kind !== (command.sessionKind ?? command.kind) ||
             command.nextSession.words.some(
               (w) => !state.words.some((s) => s.word === w && !s.archived),
             )
           )
             throw new UserError('Invalid next session.');
-          state.workspace.sessions[command.kind] = command.nextSession;
-        } else delete state.workspace.sessions[command.kind];
+          state.workspace.sessions[command.sessionKind ?? command.kind] = command.nextSession;
+        } else delete state.workspace.sessions[command.sessionKind ?? command.kind];
       }
       saved.schedule = scheduleReview(saved.schedule, command.quality, now);
       if (command.confidence !== undefined)

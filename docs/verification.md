@@ -1,3 +1,38 @@
+# Library expanded to 400 — 2026-09-14
+
+Added 176 original cards in `data/more-words.ts`: 80 C1, 60 B2, 24 B1 and 12 A2. The complete library now has 400 unique words (38 A2, 55 B1, 109 B2, 198 C1). Each added card has two original examples and four exercises. A separate batch preserves earlier exercise choices. Increased the seed subprocess output limit because the serialized library now exceeds 1 MiB.
+
+Validation passed: lint, TypeScript, 117 unit/database tests, production build, and four desktop/mobile browser checks covering search, difficulty filtering, and a full lesson and reload for the newly added word “equanimity.” Content checks cover uniqueness, word presence in both examples, cloze blanks and distinct exercise options. README counts are updated.
+
+Seeded all 400 cards in the configured hosted database. No new migration was needed. Before/after fingerprints confirmed existing profiles, progress and stored cards remained unchanged; save-function access restrictions remain intact. Application code remains local and requires pushing/redeployment for the updated Discover library to appear on the hosted frontend.
+
+---
+
+# Discovery and cumulative lessons — 2026-09-13
+
+Implemented combined saved/suggested search, strict difficulty browsing, a 224-word original library (26 A2, 31 B1, 49 B2, 118 C1), teaching before cumulative mixed exercises, owner-scoped word removal, original fictional scene examples, and contextual guidance. Saved custom cards and legacy lesson drafts remain compatible.
+
+Validation:
+
+- 116 unit/database tests pass, including 15-word coverage, weak-skill weighting, exact mixed draft persistence, removal without a zero-goal completion, revision conflicts, RLS, and preserved stored cards.
+- Full browser suites: 51 demo tests and 12 account-fixture tests passed on desktop/tablet/mobile. Three skips are intentional: two optional screenshot captures and one duplicate mobile width matrix.
+- After final keyboard-focus, tip-transition and XP-summary polish, six focused desktop/mobile browser checks passed, including full 15-word completion and a reload midway through the lesson.
+- Recreated dependencies with `npm ci` from the unchanged lockfile and removed generated `.next` output. Clean verification passed: lint, TypeScript, all 116 unit/database tests and production build. A follow-up scan found zero duplicate dependency-copy paths.
+- Source scan found no duplicate-copy files or conflict markers. Git object verification found no corrupt objects (only a harmless dangling empty tree).
+- Credential scan across current files, reachable history and production browser assets found no exposed configured secrets.
+
+Hosted database: applied `004_remove_saved_words.sql` and seeded all 224 library entries. Before/after fingerprints confirmed existing profiles, progress, saved words, daily sets/items, review events, suggestion feedback and previously stored teaching cards were unchanged. Verified anonymous/authenticated callers cannot execute privileged save functions; the service role can. No learner's real word was removed during verification. No paid AI generation or real email delivery was used in automated tests.
+
+The application code is local and has not been pushed or redeployed by this task. The hosted database is ready for the code update. Original scenes are not quotations from licensed TV, film or games; the library is curated teaching material, not a complete dictionary. Earlier results below are historical.
+
+---
+
+# Hosted migration fix — 2026-09-13
+
+Applied `003_vocabulary_practice.sql` to the configured Supabase database in response to the missing-migration error. The ledger now includes migrations 001, 002 and 003. Before/after comparisons confirmed existing profiles (excluding the new workspace column), words, saved words, daily sets/items and review events were unchanged. Verified the workspace JSONB column, enabled profile RLS, service-role save access, and blocked authenticated/anonymous direct RPC writes. Requested PostgREST schema reload. This supersedes the earlier statement that migration 003 had not been applied. No app code deployment was required for this database fix.
+
+---
+
 # Vocabulary experience verification — 2026-09-13
 
 This is the latest verification for the editable recommendations, adaptive practice, resumable sessions, multi-word usage, memory evidence, capture inbox and contextual tips update. Earlier maintenance results are retained below as history.

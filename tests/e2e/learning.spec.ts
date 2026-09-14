@@ -111,7 +111,7 @@ test('default five slots can be filled, replaced, and locked', async ({ page }) 
   await page.getByRole('button', { name: 'Add to today', exact: true }).first().click();
   await page.goto('/learn');
   await page.getByRole('button', { name: 'Start lesson', exact: true }).click();
-  await expect(page.getByText(/01 \/ 8 · Discover/)).toBeVisible();
+  await expect(page.getByText(/01 \/ 1 · Discover/)).toBeVisible();
   await page.goto('/suggested');
   await expect(page.getByText('Lesson started — your set is locked')).toBeVisible();
 });
@@ -174,7 +174,7 @@ test('word errors preserve input and long notes, favorites, archives and export 
   await page.goto('/add');
   await page.getByLabel('What’s the word?').fill('unavailableword');
   await page.getByRole('button', { name: 'Build word card' }).click();
-  await expect(page.locator('.form-error')).toContainText('20 curated words');
+  await expect(page.locator('.form-error')).toContainText('curated words');
   await expect(page.getByLabel('What’s the word?')).toHaveValue('unavailableword');
   await page.getByLabel('What’s the word?').fill('reluctant');
   await page.getByRole('button', { name: 'Build word card' }).click();
@@ -185,7 +185,9 @@ test('word errors preserve input and long notes, favorites, archives and export 
   await page.getByRole('button', { name: 'Save notes', exact: true }).click();
   await page.getByRole('button', { name: 'Favorite', exact: true }).click();
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Your notes', exact: true })).toHaveValue('n'.repeat(2000));
+  await expect(page.getByRole('textbox', { name: 'Your notes', exact: true })).toHaveValue(
+    'n'.repeat(2000),
+  );
   await expect(page.getByRole('button', { name: 'Unfavorite', exact: true })).toBeVisible();
   await page.getByText('Progress & word management', { exact: true }).click();
   await page.getByRole('button', { name: 'Archive word', exact: true }).click();

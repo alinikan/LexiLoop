@@ -1,3 +1,4 @@
+import { finishMixed } from './mixed-helper';
 import { test, expect } from '@playwright/test';
 import { catalog } from '../../data/catalog';
 import type { State } from '../../lib/domain';
@@ -48,31 +49,8 @@ test('three personal and two suggested words finish a daily loop and due review 
   expect(before.words.filter((w) => w.source === 'personal')).toHaveLength(3);
   await page.goto('/learn');
   await page.getByRole('button', { name: 'Start lesson', exact: true }).click();
-  for (const name of names) {
-    const word = catalog.find((w) => w.word === name)!;
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    for (const type of ['meaning', 'context', 'distinction']) {
-      const exercise = word.exercises.find((e) => e.type === type)!;
-      if (await page.getByLabel('Type the word').isVisible())
-        await page.getByLabel('Type the word').fill(name);
-      else await page.locator('.answer-options button').nth(exercise.answer).click();
-      await page.getByRole('button', { name: 'Check answer' }).click();
-      await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    }
-    await page.getByLabel('Type the word').fill(name);
-    await page.getByRole('button', { name: 'Check answer' }).click();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByLabel('Your own sentence').fill(`I used ${name} in my conversation today.`);
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page
-      .locator('.answer-options button')
-      .nth(word.exercises.find((e) => e.type === 'application')!.answer)
-      .click();
-    await page.getByRole('button', { name: 'Check answer' }).click();
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByLabel('I know it well').check();
-    await page.getByRole('button', { name: 'Save & continue' }).click();
-  }
+  expect(names).toHaveLength(5);
+  await finishMixed(page);
   await expect(page.getByRole('heading', { name: 'These words are yours.' })).toBeVisible();
   await page.reload();
   const learned = await read();

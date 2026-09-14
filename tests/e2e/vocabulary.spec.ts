@@ -35,12 +35,12 @@ test('recommendations are optional, editable, and captures become personal cards
   await plan.getByRole('button', { name: 'Preview my recommendations' }).click();
   for (const box of await plan.getByRole('checkbox').all())
     if (await box.isChecked()) await box.uncheck();
-  await plan.getByRole('checkbox', { name: /^reluctant / }).check();
-  await plan.getByRole('checkbox', { name: /^concise / }).check();
+  await plan.getByRole('checkbox').nth(0).check();
+  await plan.getByRole('checkbox').nth(1).check();
   await plan.getByRole('button', { name: 'Use these 2 words' }).click();
   await expect(page.getByRole('img', { name: '0 of 2 words completed' })).toBeVisible();
   await plan.getByRole('button', { name: 'Edit today’s set' }).click();
-  await plan.getByRole('checkbox', { name: /^reluctant / }).uncheck();
+  await plan.locator('input[type=checkbox]:checked').first().uncheck();
   await plan.getByRole('button', { name: 'Cancel changes' }).click();
   expect((await read(page)).days.at(-1)?.words).toHaveLength(2);
   const inbox = page.getByRole('region', { name: 'Quick capture inbox' });

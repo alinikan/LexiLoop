@@ -33,7 +33,7 @@ const guides: Record<string, Guide> = {
     steps: [
       [
         'Find your next word',
-        'Switch between Suggested and your saved words. Search narrows the list; category chips help you explore a topic. Read each definition before choosing.',
+        'Browse Suggested at your selected vocabulary level, or your saved words. Search checks both lists at every level. Category chips filter browsing; change your vocabulary level in Settings for different suggestions.',
       ],
       [
         'Today or later?',
@@ -69,11 +69,11 @@ const guides: Record<string, Guide> = {
     steps: [
       [
         'Meet the word',
-        'Start lesson begins your selected set. Read the definition and examples; use the speaker to hear the word. Continue moves to the next activity. The progress bar shows your place in the lesson.',
+        'Meet every selected new word before any exercises. Read the definition and examples, open the original mini-scene, and use the speaker to hear the word. Then exercises mix new words with every active word learned earlier.',
       ],
       [
         'Try before checking',
-        'Choose an answer or type the word, then press Check answer. Read the feedback before Continue. A mistake is useful practice, so take a moment to notice what changed.',
+        'Mixed exercises ask you to choose an answer or type a word. Press Check answer, then read the feedback. Words and skills you struggled with receive extra practice. The progress bar follows the whole session; pause whenever you need.',
       ],
       [
         'Make it yours',
@@ -117,7 +117,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Manage without surprises',
-        'Progress & word management shows the schedule. Archive word removes it from active practice; Restore word brings it back. Reset learning progress asks for confirmation and clears its schedule and practice sentence while keeping notes and past review history.',
+        'Remove from My Words deletes its notes and schedule and closes affected unfinished sessions, while retaining past activity. Progress & word management shows the schedule. Archive word removes it from active practice; Restore word brings it back. Reset learning progress asks for confirmation and clears its schedule and practice sentence while keeping notes and past review history.',
       ],
     ],
   },

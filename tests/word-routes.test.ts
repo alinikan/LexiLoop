@@ -33,7 +33,7 @@ beforeEach(() => {
   };
   mocks.adminClient.mockReturnValue({ from: vi.fn(() => chain), rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: true, error: null });
-  mocks.generate.mockResolvedValue({ ...catalog[0], word: 'meticulous' });
+  mocks.generate.mockResolvedValue({ ...catalog[0], word: 'unfathomable' });
   mocks.cacheWord.mockImplementation(async (word) => word);
 });
 afterEach(() => {
@@ -52,15 +52,15 @@ it('uses starter content without consuming generation quota', async () => {
 });
 it('reuses a cached alias without a lease, quota or AI request', async () => {
   mocks.read
-    .mockResolvedValueOnce({ data: { word: 'meticulous' }, error: null })
+    .mockResolvedValueOnce({ data: { word: 'unfathomable' }, error: null })
     .mockResolvedValueOnce({ data: { content: catalog[0] }, error: null });
-  expect((await POST(request('meticulous'))).status).toBe(200);
+  expect((await POST(request('unfathomable'))).status).toBe(200);
   expect(mocks.rpc).not.toHaveBeenCalled();
   expect(mocks.generate).not.toHaveBeenCalled();
 });
 it('returns a retry response when another request owns the generation lease', async () => {
   mocks.rpc.mockResolvedValueOnce({ data: false, error: null });
-  const response = await POST(request('meticulous'));
+  const response = await POST(request('unfathomable'));
   expect(response.status).toBe(409);
   expect(response.headers.get('retry-after')).toBe('10');
   expect(mocks.generate).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ it('rechecks the cache after claiming the lease', async () => {
     .mockResolvedValueOnce({ data: null })
     .mockResolvedValueOnce({ data: null })
     .mockResolvedValueOnce({ data: { content: catalog[0] } });
-  expect((await POST(request('meticulous'))).status).toBe(200);
+  expect((await POST(request('unfathomable'))).status).toBe(200);
   expect(mocks.generate).not.toHaveBeenCalled();
   expect(mocks.rpc.mock.calls.map((c) => c[0])).toEqual([
     'claim_word_generation',
@@ -80,12 +80,12 @@ it('rechecks the cache after claiming the lease', async () => {
 });
 it('charges only the verified user and returns persisted canonical content', async () => {
   mocks.cacheWord.mockResolvedValue(catalog[0]);
-  const response = await POST(request('meticulous'));
+  const response = await POST(request('unfathomable'));
   expect(await response.json()).toEqual({ word: catalog[0] });
   expect(mocks.rpc).toHaveBeenCalledWith('consume_generation_quota', { p_user: 'verified-user' });
   expect(mocks.cacheWord).toHaveBeenCalledWith(
-    expect.objectContaining({ word: 'meticulous' }),
-    'meticulous',
+    expect.objectContaining({ word: 'unfathomable' }),
+    'unfathomable',
   );
   expect(mocks.rpc).toHaveBeenCalledWith('release_word_generation', expect.anything());
 });
@@ -94,14 +94,14 @@ it('stops at the application quota and releases the lease', async () => {
     data: name !== 'consume_generation_quota',
     error: null,
   }));
-  const response = await POST(request('meticulous'));
+  const response = await POST(request('unfathomable'));
   expect((await response.json()).error).toContain('20 new word');
   expect(mocks.generate).not.toHaveBeenCalled();
   expect(mocks.rpc).toHaveBeenCalledWith('release_word_generation', expect.anything());
 });
 it('releases leases on provider failure without exposing raw error details', async () => {
   mocks.generate.mockRejectedValue(new Error('PRIVATE provider detail'));
-  const response = await POST(request('meticulous'));
+  const response = await POST(request('unfathomable'));
   expect(JSON.stringify(await response.json())).not.toContain('PRIVATE');
   expect(mocks.cacheWord).not.toHaveBeenCalled();
   expect(mocks.rpc).toHaveBeenCalledWith('release_word_generation', expect.anything());
@@ -111,7 +111,7 @@ it('does not mislabel database quota failures as an exhausted allowance', async 
     data: true,
     error: name === 'consume_generation_quota' ? { message: 'PRIVATE database failure' } : null,
   }));
-  const response = await POST(request('meticulous'));
+  const response = await POST(request('unfathomable'));
   expect((await response.json()).error).toContain('could not be checked');
   expect(mocks.generate).not.toHaveBeenCalled();
 });

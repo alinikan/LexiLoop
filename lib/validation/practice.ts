@@ -11,11 +11,29 @@ export const evidenceSchema = z
   .max(12);
 export const sessionSchema = z
   .object({
+    mixed: z
+      .object({
+        queue: z
+          .array(z.object({ index: z.number().int().min(0).max(9999), step: z.enum(lessonSteps) }))
+          .min(1)
+          .max(120000),
+        cursor: z.number().int().min(0),
+        progress: z.record(
+          z.string().max(60),
+          z.object({
+            evidence: evidenceSchema,
+            mistakes: z.number().int().min(0).max(12),
+            sentence: z.string().max(2000),
+            confidence: z.number().int().min(0).max(4),
+          }),
+        ),
+      })
+      .optional(),
     id: z.uuid(),
     kind: z.enum(['learn', 'review']),
     day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    words: z.array(z.string().min(2).max(60)).min(1).max(30),
-    index: z.number().int().min(0).max(29),
+    words: z.array(z.string().min(2).max(60)).min(1).max(10000),
+    index: z.number().int().min(0).max(9999),
     step: z.number().int().min(0).max(11),
     steps: z.array(z.enum(lessonSteps)).min(1).max(12),
     answer: z.number().int().min(0).max(3).nullable(),
@@ -29,6 +47,11 @@ export const sessionSchema = z
   })
   .refine(
     (d) =>
+      (!d.mixed ||
+        (d.mixed.cursor < d.mixed.queue.length &&
+          d.mixed.queue.every((t) => t.index < d.words.length) &&
+          d.mixed.queue[d.mixed.cursor].index === d.index &&
+          d.mixed.queue[d.mixed.cursor].step === d.steps[d.step])) &&
       d.index < d.words.length &&
       d.step < d.steps.length &&
       new Set(d.words).size === d.words.length,

@@ -3132,3 +3132,19 @@ html[data-motion='reduce'] *::after {
     font-size: 21px;
   }
 }
+
+.screen-scene {
+  margin: 1.2rem 0;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.screen-scene summary {
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1.6;
+}
+.screen-scene p {
+  margin-top: 0.75rem;
+}

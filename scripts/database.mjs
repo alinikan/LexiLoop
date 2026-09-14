@@ -21,8 +21,10 @@ try {
   } else if (process.argv[2] === 'seed') {
     const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/seed-data.ts'], {
       encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
     });
-    if (result.status !== 0) throw new Error(result.stderr);
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(result.stderr || 'Library serialization failed.');
     const words = JSON.parse(result.stdout);
     for (const word of words)
       await client.query('select public.cache_lexical_word($1::jsonb)', [JSON.stringify(word)]);

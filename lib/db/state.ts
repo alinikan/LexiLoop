@@ -1,3 +1,4 @@
+import { mergeCatalog } from '../catalog';
 import { UserError } from '@/lib/errors';
 import 'server-only';
 import { initialState, dayKey, type State } from '@/lib/domain';
@@ -73,7 +74,8 @@ export async function readState() {
       'Progress summaries could not be loaded. Check that database migrations are applied.',
     );
   state.summary = summary;
-  const custom = state.words.map((w) => w.word).filter((w) => !catalog.some((c) => c.word === w));
+  // Existing saved cards must retain their content, even when a library update adds the same word.
+  const custom = state.words.map((w) => w.word);
   const content: Word[] = [];
   if (custom.length) {
     for (let offset = 0; offset < custom.length; offset += 100) {
@@ -85,7 +87,7 @@ export async function readState() {
       content.push(...(data ?? []).map((w) => validateWord(w.content)));
     }
   }
-  return { state, catalog: [...catalog, ...content], userId: user.id, email: user.email };
+  return { state, catalog: mergeCatalog(catalog, content), userId: user.id, email: user.email };
 }
 export async function commitState(userId: string, before: State, state: State) {
   const { error } = await adminClient().rpc('commit_learning_state', {
@@ -94,6 +96,9 @@ export async function commitState(userId: string, before: State, state: State) {
     p_state: {
       ...state,
       summary: undefined,
+      removed_words: before.words
+        .filter((w) => !state.words.some((s) => s.word === w.word))
+        .map((w) => w.word),
       words: state.words.filter(
         (w) => JSON.stringify(w) !== JSON.stringify(before.words.find((b) => b.word === w.word)),
       ),
