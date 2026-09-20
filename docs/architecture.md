@@ -2,7 +2,7 @@
 
 Next.js pages call `protectPage`; API routes independently verify the Supabase user. The cookie-refresh proxy updates request/response cookies. HttpOnly, SameSite=Lax cookies are Secure in production. Identity comes from Supabase Auth, never a user ID submitted in a command.
 
-`readState` uses the signed-in user's client and RLS. Collections/dismissals use explicit ranges to avoid PostgREST's default row cap. Normal loads include at most 31 daily sets and 100 recent events. The `learning_summary` invoker function computes lifetime totals, streaks and seven-day activity within RLS; old history is not transferred to the browser. Full history is fetched only on an explicit authenticated export.
+`readState` uses the signed-in user's client and RLS. Collections/dismissals use explicit ranges to avoid PostgREST's default row cap. Normal loads include at most 31 daily sets, 100 recent events, saved word cards and 60 level-matched recommendations. The 5,000-card library stays in PostgreSQL: Discover queries indexed summary columns in 24-card pages and loads full JSON only when a word is opened or used. The `learning_summary` invoker function computes lifetime totals, streaks and seven-day activity within RLS; old history is not transferred to the browser. Full history is fetched only on an explicit authenticated export.
 
 Commands are schema-validated, applied by the pure reducer, and committed as changes: modified word documents, modified daily sets, newly recorded events and dismissals. The existing service-only `commit_learning_state` RPC upserts those deltas atomically under a profile row lock and expected revision. It does not delete omitted history. Revision conflicts fail explicitly. Event IDs and completed-word membership prevent duplicate awards; retries are checked against durable history even beyond the recent event window.
 
@@ -26,10 +26,12 @@ OpenAI receives only normalized vocabulary input. Canonical content and input-to
 
 The Cambridge control is an ordinary external link. No dictionary provider or API exists in the application runtime.
 
+Confirmed Auth signups enter `signup_events` through a database trigger. The table is a private outbox with no learner policy. A database webhook authenticates to the Next.js handler with a server secret; the handler claims a short lease, retrieves the email through the Supabase Auth admin API, and sends an idempotent Resend request. Failed rows retain bounded error text and can be retried by an allowlisted operator. `ADMIN_EMAILS` is checked after normal Supabase authentication for every user-management request. The browser never receives the Supabase server key or Resend key.
+
 ## Offline and account boundaries
 
 The service worker allowlists public assets. It never caches private navigations or API/auth responses. Cold offline navigation gets a reconnect page. Offline writes fail rather than pretending to save. Demo persistence is allowed only in development and is visibly labeled. Production returns no mock provider even if old flags are supplied.
 
 Sign-out navigates out of the authenticated app and notifies other same-origin tabs to clear/revalidate their state. Restoring a page from browser back/forward cache triggers a fresh read. A 401 clears client learning state and returns to sign-in. The protected route group owns one persistent client store and shell, so navigation between sections reuses loaded account state. Fonts have local system fallbacks without a remote font service.
 
-The collection itself is still loaded for browsing/filtering and schedule counts; history transfer is bounded. For very large collections, cursor pagination and content-on-demand would be a further optimization, not a reason to silently truncate data.
+Saved personal cards are still loaded for browsing/filtering and schedule counts; shared catalog transfer and history transfer are bounded. If a single learner eventually saves thousands of words, the private collection read can move to cursor pagination without truncating progress.

@@ -29,6 +29,7 @@ beforeEach(() => {
   const chain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     maybeSingle: mocks.read,
   };
   mocks.adminClient.mockReturnValue({ from: vi.fn(() => chain), rpc: mocks.rpc });
@@ -46,7 +47,10 @@ it('checks identity before starter content or privileged operations', async () =
   expect(mocks.adminClient).not.toHaveBeenCalled();
   expect(mocks.generate).not.toHaveBeenCalled();
 });
-it('uses starter content without consuming generation quota', async () => {
+it('uses seeded library content without consuming generation quota', async () => {
+  mocks.read
+    .mockResolvedValueOnce({ data: null, error: null })
+    .mockResolvedValueOnce({ data: { content: catalog[0] }, error: null });
   expect((await POST(request('RELUCTANT'))).status).toBe(200);
   expect(mocks.rpc).not.toHaveBeenCalled();
 });

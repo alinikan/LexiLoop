@@ -46,9 +46,11 @@ export default function Privacy() {
           Export your wordbook from Settings. Edit notes, archive words, and reset schedules from
           your collection. You can remove captures and practice journal entries, or discard
           unfinished sessions. Export includes these private records. Learning-tip preferences and
-          dismissals are stored in this browser. The app operator can permanently delete your
-          account in Supabase; this cascades to all personal learning records. Shared lexical
-          definitions remain.
+          dismissals are stored in this browser. Allowlisted app operators can view basic account
+          status and permanently delete an account through the private management page or Supabase;
+          this cascades to all personal learning records. Shared lexical definitions remain. A
+          confirmed signup creates a private delivery event so the operator can receive one account
+          notification by email.
         </p>
       </section>
     </main>

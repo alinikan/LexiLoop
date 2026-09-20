@@ -1,3 +1,23 @@
+# 5,000-word catalog and account operations — 2026-09-20
+
+The production seed now contains exactly 5,000 unique lesson cards: 300 A2, 1,200 B1, 2,000 B2 and 1,500 C1. The existing 401 editorial cards are preserved and 4,599 generated cards use the licensed wordfreq, Princeton WordNet and Tatoeba CC0 pipeline documented in `THIRD_PARTY_NOTICES.md`. The maintainer generator filters stopwords, surface inflections, unsuitable examples, explicit language and duplicate editorial entries. The committed JSONL is validated against the runtime lesson schema and is imported only by the database seeder.
+
+Migration 005 adds indexed catalog summary columns, a repeatable 100-card batch seed RPC, and a private confirmed-signup outbox. Production pages no longer import the full static catalog. Initial state contains saved cards plus at most 60 level-matched recommendations; Discover searches indexed summary columns in 24-card pages, renders the already-loaded recommendation summaries immediately, and fetches complete content only when a card is opened or used. A local serialization measurement put all 5,000 full cards at 14,859,530 bytes, a 60-card recommendation slice at 162,248 bytes and one 24-card summary page at 4,216 bytes. The generated JSONL was absent from production client chunks.
+
+Confirmed signups can now send one operator email through a signed Supabase Database Webhook and Resend. Delivery claims have a ten-minute lease, Resend receives a stable idempotency key, and failures remain queued with bounded diagnostic text. `ADMIN_EMAILS` protects a private user-management page and every supporting API. The page lists paginated Supabase Auth accounts, shows confirmation/recent-sign-in state, retries pending alerts, and requires the full target email before deletion. It blocks deletion of the active administrator. Deleting through Supabase Auth cascades private learning rows while shared lessons remain.
+
+Verification passed from clean generated output:
+
+- `npm run verify`: lint, TypeScript, the exact 5,000-card/unsafe-text audit, **124 tests in 14 files**, and the optimized Next.js 16 build.
+- Embedded PostgreSQL executed all five real migrations, the catalog metadata/batch seed functions, signup trigger/claim lease, migration idempotency, RLS and the existing learning transactions.
+- Route tests covered compact search responses, lazy full-card reads, the spelling index, admin field minimization, self-deletion prevention, exact-email deletion, notification retry and webhook authentication.
+- `npm run test:e2e`: **57 demo browser tests passed** on desktop and mobile with three intentional screenshot/matrix skips, then **12 account tests passed** on desktop, tablet and mobile.
+- A fresh `npm ci` reported zero known vulnerabilities. Numbered duplicate files appeared inside generated dependencies/output, were removed, and did not return after rebuilding from an empty `.next`, verification, or browser tests. A stale September 14 copy named `.git/index 2` was compared with the active index and removed; Git status and object connectivity remained healthy. Final scans found zero numbered duplicate paths or merge markers; `git diff --check` passed.
+
+No live migration, seed, deployment, Resend delivery or real account deletion was performed. Those actions require the operator's private database/hosting credentials and are covered step by step in the README.
+
+---
+
 # Accent handling, known words, and navigation polish — 2026-09-19
 
 The curated library now contains 401 cards, including `touché`. Unicode input and accent-insensitive comparison make `Touché` and `Touche` resolve to the same card. Add a word now reports exact library and personal duplicates, offers close spelling suggestions, and preserves an explicit choice to keep the typed spelling. Known words have a separate saved status and are excluded from daily sets, recommendations, lessons, review queues, and memory totals until restored to practice.

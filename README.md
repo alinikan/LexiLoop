@@ -35,7 +35,9 @@ New learning sessions first introduce every selected new word, then interleave e
 
 The wordbook supports notes, original context, tags, priority, favorites, search, filters, removal, archiving and schedule reset. **I already know this word** moves a card to its own filter and keeps it out of daily sets, lessons, reviews, recommendations, and memory totals until the learner moves it back to practice. Remove from My Words deletes that saved word’s notes and schedule, closes affected unfinished sessions, and adjusts an unfinished active daily set. Past activity and shared teaching content remain. Archive is the reversible alternative. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
 
-Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions filter unsaved words to the selected level, then rank by usefulness and interests. Search finds both Suggested and My Saved Words across all levels, including learned words. Every Discover card opens a full preview without saving it. Browsing loads 24 cards at a time. The library contains 401 original lessons: 38 A2, 55 B1, 110 B2 and 198 C1. These are editorial difficulty estimates, not certified CEFR ratings. This is a curated learning library, not a complete dictionary or an unlimited AI recommendation feed. Saved custom lessons expand a learner's available content.
+Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions filter unsaved words to the selected level, then rank by usefulness and interests. Search finds both Suggested and My Saved Words across all levels, including learned words. Every Discover card opens a full preview without saving it. The production library contains exactly 5,000 lessons: 300 A2, 1,200 B1, 2,000 B2 and 1,500 C1. It combines 401 editorial lessons with 4,599 reproducibly generated lexical lessons. Levels are useful editorial/frequency bands, not certified CEFR ratings. Saved custom lessons expand a learner's available content.
+
+The browser receives only 24 compact discovery records at a time. It fetches a full lesson when the learner opens, saves or selects that word. Initial account state contains saved cards plus at most 60 recommendations at the chosen level, so expanding the shared catalog does not turn every page load into a 5,000-card download. In the committed data, all full cards serialize to about 14.9 MB, the initial 60-card recommendation slice to about 162 KB, and a 24-card Discover summary page to about 4.2 KB.
 
 Add a word accepts Unicode letters and normalizes common variants such as `Touche` to `touché`. Before generating anything, it identifies a matching library or saved card. A close miss shows a **Did you mean…?** choice while preserving the option to keep the learner's spelling. New generated register guidance allows complete sentences; older cached register fragments that ended at the former field limit are shortened to their last complete sentence when displayed.
 
@@ -53,19 +55,20 @@ Supabase Auth → Gmail SMTP → verification and recovery emails
 
 The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreSQL, the OpenAI SDK, Zod validation, Vitest and Playwright. Node 24 is the recommended runtime. Exact dependency versions come from `package-lock.json`.
 
-| Location                 | Responsibility                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| `app/`                   | Pages, authenticated API routes and email callback                                    |
-| `components/`            | Learning interface, account forms and client state                                    |
-| `lib/domain.ts`          | Daily-set rules and commands that change learning state                               |
-| `lib/spaced-repetition/` | Review scheduling                                                                     |
-| `lib/db/`                | Verified users, private reads and authorized database writes                          |
-| `lib/ai/`                | Lesson schema, original-content prompt and provider                                   |
-| `data/catalog.ts`        | Original starter lessons plus `data/expanded.ts` and `data/more-words.ts` (401 total) |
-| `supabase/migrations/`   | Versioned SQL schema, policies and functions                                          |
-| `scripts/`               | Database setup, configuration checks and isolated test launchers                      |
-| `tests/`                 | Unit, route, embedded database and browser tests                                      |
-| `public/`                | PWA icons, service worker and offline page                                            |
+| Location                       | Responsibility                                                      |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `app/`                         | Pages, authenticated API routes and email callback                  |
+| `components/`                  | Learning interface, account forms and client state                  |
+| `lib/domain.ts`                | Daily-set rules and commands that change learning state             |
+| `lib/spaced-repetition/`       | Review scheduling                                                   |
+| `lib/db/`                      | Verified users, private reads and authorized database writes        |
+| `lib/ai/`                      | Lesson schema, original-content prompt and provider                 |
+| `data/catalog.ts`              | The 401 editorial lessons and the small offline demo catalog        |
+| `data/library.generated.jsonl` | 4,599 licensed generated lessons consumed only by the database seed |
+| `supabase/migrations/`         | Versioned SQL schema, policies and functions                        |
+| `scripts/`                     | Database setup, configuration checks and isolated test launchers    |
+| `tests/`                       | Unit, route, embedded database and browser tests                    |
+| `public/`                      | PWA icons, service worker and offline page                          |
 
 Normal reads load the whole personal collection in pages of database results, but only the latest 31 daily sets and 100 review events, plus the original daily set of any older paused lesson. PostgreSQL computes lifetime totals without transferring the entire history. Settings offers a JSON export containing all personal history; this is a download, not a database backup or an import feature.
 
@@ -176,6 +179,11 @@ Public variables beginning with `NEXT_PUBLIC_` may appear in browser JavaScript.
 | `DATABASE_URL`                         | Required for migrations/seed | **Not needed**                    | **Secret**; PostgreSQL setup connection              |
 | `OPENAI_API_KEY`                       | Your project API key         | Your project API key              | **Secret**; server-side AI access                    |
 | `OPENAI_MODEL`                         | `gpt-5.6-terra`              | `gpt-5.6-terra`                   | Server config; same fallback if unset                |
+| `ADMIN_EMAILS`                         | Operator email               | Operator email                    | Server-only admin-dashboard allowlist                |
+| `RESEND_API_KEY`                       | Resend API key               | Resend API key                    | **Secret**; confirmed-signup alert delivery          |
+| `SIGNUP_NOTIFICATION_TO`               | Operator inbox               | Operator inbox                    | Server-only signup-alert destination                 |
+| `SIGNUP_NOTIFICATION_FROM`             | Verified sender              | Verified sender                   | Server-only Resend sender name/address               |
+| `SIGNUP_WEBHOOK_SECRET`                | 32+ random characters        | Same secret                       | **Secret**; authenticates the Supabase webhook       |
 
 The current deployment uses Supabase project `https://zpmutfqbklrvwwzizkuv.supabase.co`. That URL is public configuration, not a credential. Maintainers use that project's keys privately; a separate installation should create its own project and use its own values. The template intentionally contains no actual keys or database passwords.
 
@@ -201,7 +209,7 @@ The password is the **database password**, not a Supabase account password, API 
 
 Direct connections can require IPv6 connectivity. If your network cannot connect, select **Session pooler** and copy the exact host, username and connection settings Supabase supplies. Do not invent a pooler hostname or turn off certificate validation to bypass TLS errors. See [PostgreSQL connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
 
-### Apply migrations and seed starter lessons
+### Apply migrations and seed the 5,000-word library
 
 ```bash
 npm run db:migrate
@@ -210,9 +218,9 @@ npm run db:seed
 
 A **migration** is a versioned SQL file that creates or changes database structures. The runner holds a database lock so two migration processes do not apply the same file simultaneously. It records completed files in `public.lexiloop_migrations`, the **migration ledger**. Each file and its ledger entry commit together, or both roll back on failure. Re-running skips recorded files.
 
-The current files are `001_initial.sql`, `002_production.sql`, `003_vocabulary_practice.sql`, and `004_remove_saved_words.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 003 adds private practice data. Migration 004 extends the atomic save function to remove only the requesting account’s selected saved words. Applying either migration does not delete existing progress. Run `npm run db:seed` as well: the expanded library must exist in the shared database before users save its new words. Seeding inserts missing entries and preserves existing cards. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
+The current files are `001_initial.sql` through `005_catalog_and_signup_operations.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 005 adds indexed catalog metadata and the private confirmed-signup notification outbox. It does not delete existing progress. Run `npm run db:seed` after the migration: the expanded library must exist in the shared database before users save its new words. Seeding runs in batches, inserts missing entries, refreshes search metadata and preserves canonical cards already used by learners. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
 
-The seed inserts exactly **20 original starter lessons** in a fresh database, with **20 meaning rows and 40 example rows**. It is safe to repeat: existing canonical lessons are preserved. A used database can contain more than twenty words because generated lessons are stored there too.
+The seed inserts exactly **5,000 lessons** in a fresh database: 401 editorial lessons and 4,599 generated lessons. It is safe to repeat. AI-generated personal requests can add further shared cards later.
 
 Tables include profiles, shared words/meanings/examples, private saved words, daily sets and their items, review events, suggestion feedback, generation quotas, aliases, generation leases and the migration ledger. New Auth users get a profile automatically through a database trigger. Older accounts without a profile receive one on their first successful state write.
 
@@ -231,7 +239,31 @@ from pg_policies where schemaname = 'public'
 order by tablename, policyname;
 ```
 
-The ledger should list all three migrations. All LexiLoop tables, including the ledger, should have row security enabled.
+The ledger should list all five migrations. `stored_lessons` should be at least 5,000 after seeding. All LexiLoop tables, including the ledger, should have row security enabled.
+
+### How the 5,000-word library is built
+
+The committed database seed is ready to use; Python and source corpora are not installed in production and are never sent to a learner's browser. `scripts/build-library.py` exists for maintainers who want to reproduce a future catalog release. It selects useful headwords with `wordfreq`, reads senses and definitions from Princeton WordNet through NLTK, and prefers suitable sentences from Tatoeba's English CC0 export. It removes stopwords, surface inflections, proper-name-like examples, explicit language and duplicate editorial words. Every resulting card is checked against the same Zod lesson schema used by the app.
+
+The generated dataset is a lexical foundation. The original 401 cards remain the more carefully editorialized lessons. Frequency bands provide practical A2–C1 browsing groups; they are not results from an official CEFR examination body. Before publishing a rebuilt dataset, sample every level for sense/example agreement and run the complete checks.
+
+```bash
+python3 -m venv .venv-library
+. .venv-library/bin/activate
+pip install wordfreq==3.1.1 nltk==3.9.2 better-profanity==0.7.0
+python -m nltk.downloader -d .library-nltk wordnet stopwords
+curl -L -o /tmp/eng_sentences_CC0.tsv.bz2 \
+  https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences_CC0.tsv.bz2
+bzip2 -dk /tmp/eng_sentences_CC0.tsv.bz2
+npm run library:index > /tmp/lexiloop-existing.json
+NLTK_DATA=.library-nltk python scripts/build-library.py \
+  --existing /tmp/lexiloop-existing.json \
+  --tatoeba /tmp/eng_sentences_CC0.tsv \
+  --output data/library.generated.jsonl
+npm run library:check
+```
+
+Review [third-party notices](THIRD_PARTY_NOTICES.md) before redistributing a rebuilt dataset. The generated JSONL is consumed by `npm run db:seed`; application pages never import it.
 
 ### Understand Row Level Security
 
@@ -319,6 +351,21 @@ A template using `{{ .SiteURL }}/auth/confirm?...` also works, but always return
 
 The `/auth/confirm` route verifies the token hash server-side, creates authentication cookies, and sends recovery links to `/reset-password`. Other confirmation links return to `/`. It also accepts the Supabase authorization-code flow; that flow can require the initiating browser's code-verifier cookie. Invalid or expired links go to `/login?confirmation=failed` without copying tokens into the error message. Only the internal reset destination is accepted from `next`.
 
+## Signup notifications and user management
+
+LexiLoop records a private outbox event only after Supabase marks a new email as confirmed. A signed database webhook calls a server route, which retrieves the email with the Supabase Auth admin API and sends one operator alert through Resend. The event stores delivery state, attempts and a safe error message. A short processing lease prevents concurrent sends, and the Resend idempotency key protects a retry after an uncertain response.
+
+Configure it in this order:
+
+1. Create a Resend account. For production, verify a sending domain and choose a sender such as `LexiLoop <notifications@your-domain.example>`.
+2. Generate the webhook secret locally with `openssl rand -hex 32`. Put it in `SIGNUP_WEBHOOK_SECRET` in `.env.local` and Vercel. Add `RESEND_API_KEY`, `SIGNUP_NOTIFICATION_TO`, `SIGNUP_NOTIFICATION_FROM`, and your exact sign-in email in `ADMIN_EMAILS`. Never prefix these with `NEXT_PUBLIC_`.
+3. Redeploy after saving the Vercel variables.
+4. In Supabase Dashboard, open **Database → Webhooks** and create an HTTP webhook named `lexiloop-confirmed-signup` for table `public.signup_events`, event **INSERT**, method **POST**.
+5. Set the URL to `https://lexiloop-ali.vercel.app/api/webhooks/signup` (replace the origin for another deployment). Add headers `Content-Type: application/json` and `Authorization: Bearer <the same SIGNUP_WEBHOOK_SECRET>`.
+6. Confirm a new test account. Sign in with an email listed in `ADMIN_EMAILS`, open **Manage users**, and verify both the account and email delivery. Existing confirmed accounts are not retroactively announced.
+
+The admin page uses Supabase Auth as its source of truth. It shows confirmed status, created date and last sign-in, supports 50-account pages, and can permanently delete another account after the operator types its exact email. Database foreign keys then cascade through that account's private learning data. It never exposes Auth administration to browser code; every API call verifies the current user against `ADMIN_EMAILS`. Failed signup alerts remain in the private queue and can be retried from this page. Supabase Dashboard → Authentication → Users remains the recovery interface if Resend is unavailable or the app itself cannot load.
+
 ## OpenAI setup and generation
 
 Create or select a project on the [OpenAI API platform](https://platform.openai.com), generate a private API key, and configure API billing separately from ChatGPT. A ChatGPT Plus subscription does not fund this application's API requests. Choose the key's lifetime according to your operational needs and keep it revocable.
@@ -365,7 +412,7 @@ The existing chain is **GitHub → Vercel → the existing Supabase project**. U
 For a separate deployment, import your authorized GitHub repository into Vercel, choose Next.js, use Node 24 and keep the repository root as the root directory. Use `npm ci` for installation and `npm run build` for the build. This app needs server routes; it is not a static export.
 
 1. Add the Vercel Production variables from the environment table. The app origin is `https://lexiloop-ali.vercel.app` for the existing deployment.
-2. Mark public `NEXT_PUBLIC_*` values as configuration when Vercel prompts. Exposing the website URL, Supabase project URL and publishable key is intentional. Keep `SUPABASE_SECRET_KEY` and `OPENAI_API_KEY` private.
+2. Mark public `NEXT_PUBLIC_*` values as configuration when Vercel prompts. Exposing the website URL, Supabase project URL and publishable key is intentional. Keep the Supabase/OpenAI/Resend keys and webhook secret private.
 3. Leave `DATABASE_URL` out of the Vercel runtime. Apply migrations from your local setup before code depending on them is deployed.
 4. Deploy the intended Git branch. Changes to Vercel environment values require a **new deployment**. Public variables are incorporated into browser code during the build.
 5. Confirm Supabase's production Site URL, redirect allowlist, SMTP and templates, then follow the runtime checklist below.
@@ -396,6 +443,7 @@ Run the clean verification sequence from the repository root:
 npm ci
 npm run lint
 npm run typecheck
+npm run library:check
 npm test
 npx playwright install chromium
 npm run test:e2e
@@ -404,7 +452,7 @@ npm run build
 
 On macOS with nvm, run `nvm use` first. On Linux CI, Playwright uses `npx playwright install --with-deps chromium` to install required system libraries too.
 
-`npm run verify` combines lint, TypeScript, unit/database tests and the production build. Browser tests remain an explicit command because they need Chromium installed.
+`npm run verify` combines lint, TypeScript, all 5,000-card validation, unit/database tests and the production build. Browser tests remain an explicit command because they need Chromium installed.
 
 | Check       | What it exercises                                                                                                     |
 | ----------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -430,6 +478,7 @@ A green build means code compiled and deployed. It does not prove that live Supa
 
 - [ ] Open the base production URL while signed out; it should redirect to `/login`.
 - [ ] Create an account, receive its email, follow the confirmation link, then sign in.
+- [ ] Confirm the operator receives one signup alert, then check the account in **Manage users**.
 - [ ] Check invalid email/short-password guidance and a wrong-password attempt.
 - [ ] Save profile preferences and a starter word. Reload, sign out and sign back in; confirm they remain.
 - [ ] Select a daily set, replace a word before starting, and verify that starting locks it.
@@ -501,11 +550,11 @@ Inspect runtime logs and follow the post-deployment checklist. Check missing env
 
 Secrets stay in ignored `.env.local`, Vercel's private environment or Supabase SMTP settings. Do not commit them, put them into screenshots, or prefix them with `NEXT_PUBLIC_`. `lib/db` and OpenAI provider modules have server-only import boundaries. Mutating APIs check the exact request origin and verify identity before privileged work. Authentication cookies are HttpOnly and SameSite=Lax, and Secure in production; session refresh follows Supabase SSR patterns.
 
-No analytics, payment system, Redis, cron job, storage bucket or external font service is required. Learners do not supply their own OpenAI keys. The code can be developed locally with free tools, but running the complete live app is not guaranteed to be free: OpenAI bills usage and other services have plan limits. Gmail is the private deployment's email choice; transactional email and custom domains are optional future costs.
+No analytics, payment system, Redis, cron job, storage bucket or external font service is required. Learners do not supply their own OpenAI keys. The code can be developed locally with free tools, but running the complete live app is not guaranteed to be free: OpenAI bills usage and Supabase, Vercel, Gmail and Resend have plan or delivery limits. Resend is required only for operator signup alerts; learner authentication email still uses Supabase SMTP.
 
 Capacity depends on actual usage, email delivery, database size, hosting resources and AI cost. There is no fixed guaranteed user count. Review current [Supabase plans](https://supabase.com/pricing) and [Vercel plans](https://vercel.com/pricing); account for plan-specific inactivity and backup behavior. Vercel Hobby has personal/non-commercial restrictions. Use an appropriate plan if the app's purpose changes.
 
-Back up the database according to the importance of its data and test restoration separately. A learner's JSON export is not a complete server backup. Account deletion is currently operator-managed through Supabase Auth and cascades private records; shared lesson content remains. Rotate any exposed credential with its provider, update the relevant configuration and redeploy as necessary.
+Back up the database according to the importance of its data and test restoration separately. A learner's JSON export is not a complete server backup. Account deletion is available to allowlisted operators in **Manage users** and remains available in Supabase Auth; it cascades private records while shared lesson content remains. Rotate any exposed credential with its provider, update the relevant configuration and redeploy as necessary.
 
 ## Optional learning tutorials
 
@@ -519,7 +568,7 @@ Choose **No thanks** or **Turn off tips** to dismiss tutorials. Re-enable them i
 
 On Today, choose **Preview my recommendations**. Saved priority words rank first, followed by saved personal vocabulary and words matching your interests and selected level. Ties rotate deterministically by date. Archived, learned and dismissed words are excluded. Recommendations use existing available cards and do not trigger paid generation. Due words remain in Review rather than being relabeled as new words.
 
-Select or deselect any word, then choose **Use these words**. The selected count (1–20) becomes today's goal without changing your usual goal. **Cancel changes** leaves the saved set alone. **Edit today’s set** remains available until starting. **Add a different word** opens the normal word-card flow. The starter pool is finite; if it runs out, add personal words. Recommendations are a convenience, never a mandatory curriculum.
+Select or deselect any word, then choose **Use these words**. The selected count (1–20) becomes today's goal without changing your usual goal. **Cancel changes** leaves the saved set alone. **Edit today’s set** remains available until starting. **Add a different word** opens the normal word-card flow. Recommendations draw from the selected level of the 5,000-word library; add personal words whenever a word from your own life matters more. Recommendations are a convenience, never a mandatory curriculum.
 
 ### Practice that responds to mistakes
 
@@ -550,12 +599,12 @@ Enable **Learning tips** in Settings or accept **Show me how**. Short tips appea
 ### Upgrade and acceptance checks
 
 1. Back up your database using your existing operational process.
-2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm `003_vocabulary_practice.sql` and `004_remove_saved_words.sql` are in the ledger, then run `npm run db:seed`.
+2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm migration `005_catalog_and_signup_operations.sql` is in the ledger, then run `npm run db:seed`.
 3. Run `npm run verify` and `npm run test:e2e` locally.
 4. Deploy the updated code to the existing project.
 5. With a real account, accept an edited recommendation, capture a word, and pause a lesson. Reopen it on another signed-in device and check the exact answer and position. Then verify word-use journal entries and export.
 
-Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 003 has been applied to your hosted project or replace a real cross-device acceptance check. No live database migration or deployment is performed just by editing this repository.
+Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 005 has been applied to your hosted project, that 5,000 rows were seeded there, or that Resend accepted a live message. No live database migration or deployment is performed just by editing this repository.
 
 ### Mixed lessons, search, and real-life examples
 

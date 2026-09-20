@@ -26,16 +26,24 @@ export async function POST(request: Request) {
       .object({ version: z.number().int().nonnegative(), command: z.unknown() })
       .parse(await readJson(request, 8000000));
     const command = commandSchema.parse(body.command);
-    const current = await readState();
+    const current = await readState({ recommendations: false });
     if (body.version !== current.state.version)
       throw new UserError('Your progress changed in another tab. Reload and try again.');
-    if (command.type === 'save' && !current.catalog.some((w) => w.word === command.word)) {
-      const { data } = await adminClient()
+    const requested =
+      command.type === 'daily-plan'
+        ? command.words
+        : command.type === 'save' || command.type === 'know'
+          ? [command.word]
+          : [];
+    const missing = requested.filter((word) => !current.catalog.some((item) => item.word === word));
+    if (missing.length) {
+      const { data, error } = await adminClient()
         .from('words')
         .select('content')
-        .eq('word', command.word)
-        .maybeSingle();
-      if (data) current.catalog.push(validateWord(data.content));
+        .in('word', missing)
+        .eq('published', true);
+      if (error) throw new UserError('The vocabulary library could not be read. Please retry.');
+      current.catalog.push(...(data ?? []).map((row) => validateWord(row.content)));
     }
     if (command.type === 'complete') {
       const { data: previous, error } = await adminClient()
@@ -53,9 +61,14 @@ export async function POST(request: Request) {
     }
     const state = applyCommand(current.state, command, current.catalog);
     await commitState(current.userId, current.state, state);
-    const refreshed = await readState();
+    const refreshed = await readState({ recommendations: command.type === 'settings' });
     return NextResponse.json(
-      { state: refreshed.state },
+      {
+        state: refreshed.state,
+        ...(command.type === 'settings'
+          ? { catalog: refreshed.catalog, catalogSize: refreshed.catalogSize }
+          : {}),
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

@@ -13,6 +13,7 @@ import {
   Flame,
   ArrowUpRight,
   AudioLines,
+  Users,
 } from 'lucide-react';
 import { appConfig, demoMode } from '@/lib/config';
 import { useStore } from '../store';
@@ -27,7 +28,7 @@ const nav = [
 ];
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname(),
-    { state, ready, error, message, offline, reload } = useStore();
+    { state, isAdmin, ready, error, message, offline, reload } = useStore();
   const stats = metrics(state);
   return (
     <div className="app-shell">
@@ -67,6 +68,11 @@ export function Shell({ children }: { children: ReactNode }) {
             </p>
             <span className="tiny">{appConfig.tagline}</span>
           </div>
+          {isAdmin && (
+            <Link href="/admin" className={'nav-link ' + (path === '/admin' ? 'active' : '')}>
+              <Users size={20} /> Manage users
+            </Link>
+          )}
           <Link href="/settings" className={'nav-link ' + (path === '/settings' ? 'active' : '')}>
             <Settings size={20} /> Settings
           </Link>

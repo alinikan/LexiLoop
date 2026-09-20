@@ -1,8 +1,7 @@
 import { UserError } from '@/lib/errors';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
-import { catalog } from '@/data/catalog';
-import { inputWordSchema } from '@/lib/validation/word';
+import { comparableWord, inputWordSchema } from '@/lib/validation/word';
 import { getProvider } from '@/lib/ai/provider';
 import { validateWord } from '@/lib/ai/schemas';
 import { cacheWord } from '@/lib/db/state';
@@ -16,12 +15,6 @@ export async function POST(request: Request) {
     if (Number(request.headers.get('content-length')) > 1000)
       throw new UserError('Please enter just the word.');
     const { word } = z.object({ word: inputWordSchema }).parse(await readJson(request, 1000));
-    const seed = catalog.find((w) => w.word === word);
-    if (seed)
-      return NextResponse.json(
-        { word: seed, existing: true },
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
     const db = adminClient();
     const { data: alias, error: aliasError } = await db
       .from('word_aliases')
@@ -33,7 +26,9 @@ export async function POST(request: Request) {
     const { data: cached, error } = await db
       .from('words')
       .select('content')
-      .eq('word', alias?.word ?? word)
+      .eq('normalized_word', comparableWord(alias?.word ?? word))
+      .eq('published', true)
+      .limit(1)
       .maybeSingle();
     if (error) throw new UserError('Word storage is unavailable. Please try again.');
     if (cached)
@@ -63,7 +58,9 @@ export async function POST(request: Request) {
       const { data: fresh, error: freshError } = await db
         .from('words')
         .select('content')
-        .eq('word', freshAlias?.word ?? word)
+        .eq('normalized_word', comparableWord(freshAlias?.word ?? word))
+        .eq('published', true)
+        .limit(1)
         .maybeSingle();
       if (freshError) throw new UserError('Word storage is unavailable. Please retry.');
       if (fresh)

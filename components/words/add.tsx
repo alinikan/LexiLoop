@@ -1,5 +1,5 @@
 'use client';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { workspace } from '@/lib/practice';
@@ -10,7 +10,8 @@ import type { Word } from '@/lib/ai/schemas';
 import { todaySet } from '@/lib/domain';
 import { comparableWord, inputWordSchema, suggestWord } from '@/lib/validation/word';
 export function AddWord() {
-  const { state, catalog, generate, dispatch, busy, notify } = useStore();
+  const { state, catalog, generate, loadWord, ensureCatalogNames, dispatch, busy, notify } =
+    useStore();
   const params = useSearchParams();
   const capture = workspace(state).inbox.find((c) => c.id === params.get('capture'));
   const [input, setInput] = useState(capture?.word ?? ''),
@@ -21,19 +22,29 @@ export function AddWord() {
     [word, setWord] = useState<Word | null>(null),
     [suggestion, setSuggestion] = useState<Word | null>(null),
     [lookupMessage, setLookupMessage] = useState(''),
+    [libraryNames, setLibraryNames] = useState<string[]>(catalog.map((item) => item.word)),
     [loading, setLoading] = useState(false),
     [error, setError] = useState('');
   const existing = state.words.find((w) => w.word === word?.word),
     today = todaySet(state);
   const parsedInput = inputWordSchema.safeParse(input);
-  const inputCard = parsedInput.success
-    ? catalog.find(
-        (candidate) => comparableWord(candidate.word) === comparableWord(parsedInput.data),
+  const inputName = parsedInput.success
+    ? libraryNames.find(
+        (candidate) => comparableWord(candidate) === comparableWord(parsedInput.data),
       )
     : undefined;
-  const inputSaved = inputCard
-    ? state.words.find((saved) => saved.word === inputCard.word)
-    : undefined;
+  const inputSaved = inputName ? state.words.find((saved) => saved.word === inputName) : undefined;
+  useEffect(() => {
+    let active = true;
+    void ensureCatalogNames()
+      .then((values) => {
+        if (active) setLibraryNames(values);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [ensureCatalogNames]);
   async function build(e: FormEvent) {
     e.preventDefault();
     await buildWord(false);
@@ -45,10 +56,11 @@ export function AddWord() {
     setLookupMessage('');
     try {
       const normalized = inputWordSchema.parse(input);
-      const exact = catalog.find(
-        (candidate) => comparableWord(candidate.word) === comparableWord(normalized),
+      const exactName = libraryNames.find(
+        (candidate) => comparableWord(candidate) === comparableWord(normalized),
       );
-      if (exact) {
+      if (exactName) {
+        const exact = await loadWord(exactName);
         setInput(exact.word);
         setWord(exact);
         setSuggestion(null);
@@ -60,12 +72,9 @@ export function AddWord() {
         return;
       }
       if (!keepTypedWord) {
-        const suggested = suggestWord(
-          normalized,
-          catalog.map((candidate) => candidate.word),
-        );
+        const suggested = suggestWord(normalized, libraryNames);
         if (suggested) {
-          setSuggestion(catalog.find((candidate) => candidate.word === suggested) ?? null);
+          setSuggestion(await loadWord(suggested));
           return;
         }
       }
@@ -144,13 +153,13 @@ export function AddWord() {
           </label>
           {inputSaved && (
             <p className="field-note success" role="status">
-              <Check size={16} /> “{inputCard?.word}” is already in My Words.
-              <Link href={`/collection?word=${encodeURIComponent(inputCard!.word)}`}>Open it</Link>
+              <Check size={16} /> “{inputSaved.word}” is already in My Words.
+              <Link href={`/collection?word=${encodeURIComponent(inputSaved.word)}`}>Open it</Link>
             </p>
           )}
-          {!inputSaved && inputCard && (
+          {!inputSaved && inputName && (
             <p className="field-note" role="status">
-              “{inputCard.word}” already exists in LexiLoop. Build the card to preview it—no new
+              “{inputName}” already exists in LexiLoop. Build the card to preview it—no new
               generation is needed.
             </p>
           )}

@@ -3,9 +3,9 @@ import { UserError } from '@/lib/errors';
 import 'server-only';
 import { initialState, dayKey, type State } from '@/lib/domain';
 import { validateWord, type Word } from '@/lib/ai/schemas';
-import { catalog } from '@/data/catalog';
 import { requireUser, adminClient } from './server';
-export async function readState() {
+import { isAdminEmail } from '@/lib/admin';
+export async function readState(options: { recommendations?: boolean } = {}) {
   const { db, user } = await requireUser();
   const [
     { data: profile, error: pe },
@@ -87,7 +87,35 @@ export async function readState() {
       content.push(...(data ?? []).map((w) => validateWord(w.content)));
     }
   }
-  return { state, catalog: mergeCatalog(catalog, content), userId: user.id, email: user.email };
+  let recommended: Word[] = [];
+  let catalogSize: number | undefined;
+  if (options.recommendations !== false) {
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      db
+        .from('words')
+        .select('content')
+        .eq('published', true)
+        .eq('difficulty', state.settings.level)
+        .order('usefulness', { ascending: false })
+        .order('frequency_rank', { ascending: true, nullsFirst: false })
+        .limit(60),
+      db.from('words').select('word', { count: 'exact', head: true }).eq('published', true),
+    ]);
+    if (error || countError)
+      throw new UserError(
+        'The vocabulary library could not be loaded. Apply the latest migration and seed.',
+      );
+    recommended = (data ?? []).map((row) => validateWord(row.content));
+    catalogSize = count ?? undefined;
+  }
+  return {
+    state,
+    catalog: mergeCatalog(recommended, content),
+    catalogSize,
+    userId: user.id,
+    email: user.email,
+    isAdmin: isAdminEmail(user.email),
+  };
 }
 export async function commitState(userId: string, before: State, state: State) {
   const { error } = await adminClient().rpc('commit_learning_state', {

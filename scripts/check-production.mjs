@@ -33,8 +33,23 @@ for (const name of [
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SECRET_KEY',
   'OPENAI_API_KEY',
+  'ADMIN_EMAILS',
+  'RESEND_API_KEY',
+  'SIGNUP_NOTIFICATION_TO',
+  'SIGNUP_NOTIFICATION_FROM',
+  'SIGNUP_WEBHOOK_SECRET',
 ])
   if (!process.env[name]?.trim()) problems.push(`${name} is missing.`);
+for (const email of (process.env.ADMIN_EMAILS ?? '').split(',').filter(Boolean))
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+    problems.push('ADMIN_EMAILS must contain comma-separated email addresses.');
+if (
+  process.env.SIGNUP_NOTIFICATION_TO &&
+  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.SIGNUP_NOTIFICATION_TO)
+)
+  problems.push('SIGNUP_NOTIFICATION_TO must be an email address.');
+if ((process.env.SIGNUP_WEBHOOK_SECRET?.length ?? 0) < 32)
+  problems.push('SIGNUP_WEBHOOK_SECRET must contain at least 32 characters.');
 if (
   process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
   process.env.MOCK_AI === 'true' ||

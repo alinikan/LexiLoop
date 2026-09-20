@@ -3033,6 +3033,156 @@ html[data-motion='reduce'] *::after {
   }
 }
 
+/* Private account operations. */
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.admin-metrics .panel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 3px 12px;
+}
+.admin-metrics svg {
+  grid-row: 1 / 3;
+  color: var(--primary);
+}
+.admin-metrics strong {
+  font-size: 28px;
+  line-height: 1;
+}
+.admin-metrics span,
+.admin-users td span,
+.notification-queue p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.notification-queue,
+.admin-toolbar,
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.notification-queue {
+  margin-bottom: 22px;
+}
+.notification-queue p {
+  margin: 0;
+  max-width: 700px;
+}
+.admin-toolbar {
+  margin-bottom: 20px;
+}
+.admin-toolbar .search-field {
+  max-width: 330px;
+}
+.admin-table-wrap {
+  overflow-x: auto;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+.admin-table th,
+.admin-table td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.admin-table th {
+  color: var(--muted);
+  font-weight: 650;
+}
+.admin-table td:first-child strong,
+.admin-table td:first-child span {
+  display: block;
+}
+.status-chip {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: var(--primary-soft);
+}
+.status-chip.success {
+  background: #e3f6ea;
+  color: #287548;
+}
+:root[data-theme='dark'] .status-chip.success {
+  background: #244335;
+  color: #9edbb8;
+}
+.icon-button.danger {
+  color: #a33e4c;
+}
+.admin-pagination {
+  margin-top: 20px;
+}
+.empty-row {
+  padding: 30px;
+  text-align: center;
+  color: var(--muted);
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #10142699;
+  backdrop-filter: blur(5px);
+}
+.delete-dialog {
+  width: min(100%, 520px);
+}
+.delete-dialog > svg {
+  color: #b33f50;
+}
+.danger-button {
+  background: #a83243;
+  border-color: #a83243;
+  color: white;
+}
+.catalog-skeleton {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.catalog-skeleton span {
+  min-height: 290px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: linear-gradient(
+    100deg,
+    var(--surface) 35%,
+    var(--primary-soft) 50%,
+    var(--surface) 65%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+@media (max-width: 800px) {
+  .admin-metrics,
+  .catalog-skeleton {
+    grid-template-columns: 1fr;
+  }
+  .notification-queue,
+  .admin-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-toolbar .search-field {
+    max-width: none;
+  }
+}
+
 /* Vocabulary tools: quiet, editable and grounded in the user's own words. */
 .daily-plan,
 .resume-panel,

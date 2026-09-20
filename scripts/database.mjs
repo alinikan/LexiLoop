@@ -21,14 +21,16 @@ try {
   } else if (process.argv[2] === 'seed') {
     const result = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/seed-data.ts'], {
       encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
+      maxBuffer: 64 * 1024 * 1024,
     });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(result.stderr || 'Library serialization failed.');
-    const words = JSON.parse(result.stdout);
-    for (const word of words)
-      await client.query('select public.cache_lexical_word($1::jsonb)', [JSON.stringify(word)]);
-    console.log(`Seeded ${words.length} original word lessons.`);
+    const entries = JSON.parse(result.stdout);
+    for (let offset = 0; offset < entries.length; offset += 100)
+      await client.query('select public.seed_lexical_batch($1::jsonb)', [
+        JSON.stringify(entries.slice(offset, offset + 100)),
+      ]);
+    console.log(`Seeded ${entries.length} licensed word lessons in database batches.`);
   } else throw new Error('Use migrate or seed.');
 } finally {
   await client.end();

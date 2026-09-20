@@ -9,7 +9,7 @@ let db: PGlite;
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(
-    `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}'::jsonb);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users(id) values('${user}'),('${other}');`,
+    `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}'::jsonb);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users(id,email) values('${user}','learner@example.com'),('${other}','other@example.com');`,
   );
   // PGlite is single-process; stand-ins allow the real migration runner to execute.
   await db.exec(
@@ -38,6 +38,60 @@ it('migrates and seeds canonical content with normalized meanings and examples',
   expect((await db.query('select count(*)::int as count from words')).rows).toEqual([
     { count: catalog.length },
   ]);
+  expect(
+    (
+      await db.query('select normalized_word,difficulty,published from words where word=$1', [
+        catalog[0].word,
+      ])
+    ).rows,
+  ).toEqual([
+    { normalized_word: catalog[0].word, difficulty: catalog[0].difficulty, published: true },
+  ]);
+  expect(
+    (
+      await db.query<{ seeded: number }>('select seed_lexical_batch($1::jsonb) seeded', [
+        JSON.stringify([
+          {
+            source: 'editorial',
+            frequencyRank: null,
+            normalizedWord: catalog[0].word,
+            content: catalog[0],
+          },
+        ]),
+      ])
+    ).rows,
+  ).toEqual([{ seeded: 1 }]);
+  expect(
+    (await db.query('select source from words where word=$1', [catalog[0].word])).rows,
+  ).toEqual([{ source: 'editorial' }]);
+});
+
+it('captures confirmed signups once and safely claims their notification', async () => {
+  const newcomer = '60000000-0000-4000-8000-000000000006';
+  await db.query('insert into auth.users(id,email,email_confirmed_at) values($1,$2,$3)', [
+    newcomer,
+    'new@example.com',
+    '2026-09-19T18:00:00Z',
+  ]);
+  expect(
+    (
+      await db.query('select user_id,attempts,notified_at from signup_events where user_id=$1', [
+        newcomer,
+      ])
+    ).rows,
+  ).toEqual([{ user_id: newcomer, attempts: 0, notified_at: null }]);
+  expect((await db.query('select claim_signup_notification($1) claimed', [newcomer])).rows).toEqual(
+    [{ claimed: true }],
+  );
+  expect((await db.query('select claim_signup_notification($1) claimed', [newcomer])).rows).toEqual(
+    [{ claimed: false }],
+  );
+  expect(
+    (await db.query('select attempts from signup_events where user_id=$1', [newcomer])).rows,
+  ).toEqual([{ attempts: 1 }]);
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${newcomer}';`);
+  await expect(db.query('select * from signup_events')).rejects.toThrow(/permission denied/);
+  await db.exec('reset role');
 });
 it('commits normalized daily data atomically and rejects stale revisions', async () => {
   const now = new Date('2026-09-12T12:00:00Z');
@@ -72,7 +126,9 @@ it('commits normalized daily data atomically and rejects stale revisions', async
   await expect(
     db.query('select commit_learning_state($1,0,$2::jsonb)', [user, JSON.stringify(state)]),
   ).rejects.toThrow('revision_conflict');
-  expect((await db.query('select revision from profiles')).rows).toEqual([{ revision: 4 }]);
+  expect((await db.query('select revision from profiles where id=$1', [user])).rows).toEqual([
+    { revision: 4 },
+  ]);
 });
 it('enforces ownership and denies client writes and privileged RPC access', async () => {
   await db.exec(`set role authenticated;set request.jwt.claim.sub='${other}';`);
@@ -195,6 +251,7 @@ it('records migrations in the ledger and safely skips a second run', async () =>
     { name: '002_production.sql' },
     { name: '003_vocabulary_practice.sql' },
     { name: '004_remove_saved_words.sql' },
+    { name: '005_catalog_and_signup_operations.sql' },
   ]);
   expect(await migrate(migrationClient())).toEqual([]);
   expect(

@@ -8,8 +8,6 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { mergeCatalog } from '@/lib/catalog';
-import { catalog as seed } from '@/data/catalog';
 import { initialState, applyCommand, type State, type Command } from '@/lib/domain';
 import { type Word, validateWord } from '@/lib/ai/schemas';
 import { demoMode } from '@/lib/config';
@@ -19,6 +17,8 @@ import { inputWordSchema } from '@/lib/validation/word';
 type Store = {
   state: State;
   catalog: Word[];
+  catalogSize: number;
+  isAdmin: boolean;
   ready: boolean;
   busy: boolean;
   offline: boolean;
@@ -26,6 +26,8 @@ type Store = {
   message: string;
   dispatch: (command: Command) => Promise<boolean>;
   generate: (word: string) => Promise<{ word: Word; existing: boolean }>;
+  loadWord: (word: string) => Promise<Word>;
+  ensureCatalogNames: () => Promise<string[]>;
   notify: (message: string) => void;
   reload: () => void;
 };
@@ -33,7 +35,9 @@ const Context = createContext<Store | null>(null);
 const KEY = 'lexiloop-demo-v1';
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(initialState),
-    [catalog, setCatalog] = useState(seed),
+    [catalog, setCatalog] = useState<Word[]>([]),
+    [catalogSize, setCatalogSize] = useState(0),
+    [isAdmin, setIsAdmin] = useState(false),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
     [offline, setOffline] = useState(false),
@@ -41,11 +45,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [message, setMessage] = useState('');
   const [, refreshClock] = useState(0);
   const current = useRef(state),
-    queue = useRef<Promise<unknown>>(Promise.resolve());
+    queue = useRef<Promise<unknown>>(Promise.resolve()),
+    names = useRef<string[] | null>(null);
   const reload = useCallback(async () => {
     setError('');
     try {
       if (demoMode) {
+        const { catalog: seed } = await import('@/data/catalog');
         const raw = localStorage.getItem(KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
@@ -56,20 +62,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ) {
             current.current = parsed.state;
             setState(parsed.state);
-            setCatalog(mergeCatalog(seed, parsed.catalog.map(validateWord)));
+            const stored = Array.isArray(parsed.catalog) ? parsed.catalog.map(validateWord) : seed;
+            const custom = new Map(stored.map((word: Word) => [word.word, word]));
+            setCatalog([
+              ...seed.map((word) => custom.get(word.word) ?? word),
+              ...stored.filter((word: Word) => !seed.some((item) => item.word === word.word)),
+            ]);
+          } else {
+            setCatalog(seed);
           }
         } else {
           const fresh = initialState();
           fresh.settings.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           current.current = fresh;
           setState(fresh);
+          setCatalog(seed);
         }
+        setCatalogSize(seed.length);
+        setIsAdmin(false);
       } else {
         const res = await fetch('/api/state', { cache: 'no-store' });
         const data = await res.json();
         if (res.status === 401) {
           setState(initialState());
-          setCatalog(seed);
+          setCatalog([]);
           setReady(false);
           window.location.replace('/login');
           throw new Error('Please sign in to continue.');
@@ -78,6 +94,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         current.current = data.state;
         setState(data.state);
         setCatalog(data.catalog.map(validateWord));
+        setCatalogSize(data.catalogSize ?? data.catalog.length);
+        setIsAdmin(data.isAdmin === true);
       }
       setReady(true);
     } catch (e) {
@@ -165,13 +183,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         if (res.status === 401) {
           setState(initialState());
-          setCatalog(seed);
+          setCatalog([]);
           setReady(false);
           window.location.replace('/login');
           throw new Error('Please sign in to continue.');
         }
         if (!res.ok) throw new Error(data.error);
         next = data.state;
+        if (Array.isArray(data.catalog)) {
+          setCatalog(data.catalog.map(validateWord));
+          setCatalogSize(data.catalogSize ?? data.catalog.length);
+        }
       }
       current.current = next;
       setState(next);
@@ -195,7 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (existing && demoMode) return { word: existing, existing: true };
     if (demoMode)
       throw new Error(
-        `Demo mode includes ${seed.length} curated words. Try “reluctant”, “feasible”, or “clarify”. Configure live AI for other words.`,
+        `Demo mode includes ${catalog.length} curated words. Try “reluctant”, “feasible”, or “clarify”. Configure live AI for other words.`,
       );
     if (!navigator.onLine)
       throw new Error('Reconnect to build a new word. Your input is still here.');
@@ -207,7 +229,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (res.status === 401) {
       setState(initialState());
-      setCatalog(seed);
+      setCatalog([]);
       setReady(false);
       window.location.replace('/login');
       throw new Error('Please sign in to continue.');
@@ -219,11 +241,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
     return { word, existing: data.existing === true };
   }
+  const loadWord = useCallback(
+    async (name: string) => {
+      const existing = catalog.find((word) => word.word === name);
+      if (existing) return existing;
+      if (demoMode) throw new Error('That word is not available in this device demo.');
+      const response = await fetch(`/api/catalog/${encodeURIComponent(name)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      const word = validateWord(data.word);
+      setCatalog((previous) =>
+        previous.some((item) => item.word === word.word) ? previous : [...previous, word],
+      );
+      return word;
+    },
+    [catalog],
+  );
+  const ensureCatalogNames = useCallback(async () => {
+    if (names.current) return names.current;
+    if (demoMode) {
+      names.current = catalog.map((word) => word.word);
+      return names.current;
+    }
+    const response = await fetch('/api/catalog/names');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    names.current = data.names;
+    return names.current!;
+  }, [catalog]);
   return (
     <Context.Provider
       value={{
         state,
         catalog,
+        catalogSize,
+        isAdmin,
         ready,
         busy,
         offline,
@@ -231,6 +283,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         message,
         dispatch,
         generate,
+        loadWord,
+        ensureCatalogNames,
         notify: setMessage,
         reload: () => void reload(),
       }}

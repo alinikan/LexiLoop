@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { TutorialSettings } from './tutorial';
-import { Bell, Download, ArrowRight, Check, LogOut, Smartphone } from 'lucide-react';
+import { Bell, Download, ArrowRight, Check, LogOut, Smartphone, Users } from 'lucide-react';
 import { useStore } from './store';
 import { demoMode } from '@/lib/config';
 import { settingsSchema } from '@/lib/validation/commands';
@@ -119,7 +119,7 @@ export function Onboarding() {
   );
 }
 export function Settings() {
-  const { state, catalog, dispatch, busy, notify } = useStore();
+  const { state, catalog, isAdmin, dispatch, busy, notify } = useStore();
   const [settings, setSettings] = useState(state.settings),
     [error, setError] = useState(''),
     [permission, setPermission] = useState('');
@@ -363,6 +363,12 @@ export function Settings() {
           </div>
           <div className="panel">
             <h3>Keep exploring</h3>
+            {isAdmin && (
+              <Link className="nav-link" href="/admin">
+                <Users size={17} /> Manage users
+                <ArrowRight size={17} />
+              </Link>
+            )}
             <Link className="nav-link" href="/progress">
               Your progress
               <ArrowRight size={17} />

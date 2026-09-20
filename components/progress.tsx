@@ -3,7 +3,7 @@ import { Trophy, Flame, Target, BookOpen, Check } from 'lucide-react';
 import { useStore } from './store';
 import { metrics, dayKey } from '@/lib/domain';
 import { MemoryProgress } from './vocabulary-tools';
-import { achievements } from '@/data/catalog';
+import { achievements } from '@/data/achievements';
 export function Progress() {
   const { state } = useStore(),
     stats = metrics(state);
