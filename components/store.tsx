@@ -25,7 +25,7 @@ type Store = {
   error: string;
   message: string;
   dispatch: (command: Command) => Promise<boolean>;
-  generate: (word: string) => Promise<Word>;
+  generate: (word: string) => Promise<{ word: Word; existing: boolean }>;
   notify: (message: string) => void;
   reload: () => void;
 };
@@ -121,9 +121,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [reload]);
   useEffect(() => {
+    if (!ready) return;
     document.documentElement.dataset.theme = state.settings.dark ? 'dark' : 'light';
+    localStorage.setItem('lexiloop.theme', state.settings.dark ? 'dark' : 'light');
     document.documentElement.dataset.motion = state.settings.reducedMotion ? 'reduce' : 'system';
-  }, [state.settings.dark, state.settings.reducedMotion]);
+  }, [ready, state.settings.dark, state.settings.reducedMotion]);
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(''), 4500);
@@ -190,7 +192,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   async function generate(input: string) {
     const normalized = inputWordSchema.parse(input);
     const existing = catalog.find((w) => w.word === normalized);
-    if (existing && demoMode) return existing;
+    if (existing && demoMode) return { word: existing, existing: true };
     if (demoMode)
       throw new Error(
         `Demo mode includes ${seed.length} curated words. Try “reluctant”, “feasible”, or “clarify”. Configure live AI for other words.`,
@@ -215,7 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCatalog((previous) =>
       previous.some((w) => w.word === word.word) ? previous : [...previous, word],
     );
-    return word;
+    return { word, existing: data.existing === true };
   }
   return (
     <Context.Provider

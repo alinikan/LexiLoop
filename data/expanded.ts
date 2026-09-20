@@ -260,7 +260,10 @@ function buildBatch(rows: string[][]): Word[] {
         },
         {
           type: 'context',
-          prompt: first.replace(new RegExp(`\\b${word}\\b`, 'i'), '_____'),
+          prompt: first.replace(
+            new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu'),
+            '_____',
+          ),
           options: [word, distractors[0][0], distractors[1][0]],
           answer: 0,
           explanation: `${explanation} ${first}`,

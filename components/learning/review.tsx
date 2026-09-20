@@ -15,7 +15,7 @@ export function Review() {
   const selected = params.get('word');
   const [session, setSession] = useState<Word[] | null>(null);
   const due = dueWords(state),
-    learned = state.words.filter((w) => !w.archived && w.schedule.firstLearned);
+    learned = state.words.filter((w) => !w.archived && !w.known && w.schedule.firstLearned);
   if (session) return <Session words={session} kind="review" onDone={() => setSession(null)} />;
   function start(names: string[]) {
     setSession(names.map((n) => catalog.find((w) => w.word === n)!).filter(Boolean));

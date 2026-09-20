@@ -37,7 +37,8 @@ export const commandSchema = z.discriminatedUnion('type', [
     toToday: z.boolean().optional(),
     captureId: z.uuid().optional(),
   }),
-  ...(['select', 'remove', 'dismiss', 'reset', 'forget'] as const).map((type) =>
+  z.object({ type: z.literal('know'), word, source: z.enum(['personal', 'suggested']).optional() }),
+  ...(['select', 'remove', 'dismiss', 'reset', 'forget', 'practice-word'] as const).map((type) =>
     z.object({ type: z.literal(type), word }),
   ),
   z.object({ type: z.literal('start') }),

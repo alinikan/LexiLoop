@@ -1,8 +1,8 @@
 'use client';
-import { ScreenScene } from './screen-scene';
-import { CambridgeSection } from './cambridge';
+import { CambridgeLink } from './cambridge-link';
 import { Volume2, Lightbulb } from 'lucide-react';
 import type { Word } from '@/lib/ai/schemas';
+import { displayRegister } from '@/lib/word-content';
 export function WordDetail({ word }: { word: Word }) {
   return (
     <div className="word-detail">
@@ -38,7 +38,7 @@ export function WordDetail({ word }: { word: Word }) {
           Sensitive language: check the usage guidance before using this term.
         </p>
       )}
-      <span className="word-meta">{word.register}</span>
+      <span className="word-meta">{displayRegister(word)}</span>
       {word.meanings.map((meaning, i) => (
         <section key={i}>
           <h3>
@@ -57,9 +57,8 @@ export function WordDetail({ word }: { word: Word }) {
           ))}
         </section>
       ))}
-      <ScreenScene word={word} />
       <section>
-        <h3>Picture this</h3>
+        <h3>A real-life situation</h3>
         <p>{word.scenario}</p>
       </section>
       <div className="detail-columns">
@@ -108,7 +107,7 @@ export function WordDetail({ word }: { word: Word }) {
         <Lightbulb size={22} />
         <p>{word.memoryHook}</p>
       </div>
-      <CambridgeSection key={word.word} word={word.word} />
+      <CambridgeLink word={word.word} />
     </div>
   );
 }

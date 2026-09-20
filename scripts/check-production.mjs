@@ -64,20 +64,10 @@ for (const name of ['NEXT_PUBLIC_APP_URL', 'NEXT_PUBLIC_SUPABASE_URL']) {
     problems.push(`${name} must be a valid URL.`);
   }
 }
-if (
-  process.env.CAMBRIDGE_LICENSE_CONFIRMED === 'true' &&
-  (!process.env.CAMBRIDGE_API_KEY || !process.env.CAMBRIDGE_DICTIONARY_CODE)
-)
-  problems.push('Licensed Cambridge requires its API key and dictionary code.');
-if (
-  process.env.CAMBRIDGE_AUDIO_LICENSE_CONFIRMED === 'true' &&
-  process.env.CAMBRIDGE_LICENSE_CONFIRMED !== 'true'
-)
-  problems.push('Cambridge audio requires the dictionary license gate as well.');
 if (problems.length) {
   console.error(problems.join('\n'));
   process.exitCode = 1;
 } else
   console.log(
-    'Production configuration checks passed. This does not verify service credentials, model access, billing, SMTP delivery, or Cambridge license rights.',
+    'Production configuration checks passed. This does not verify service credentials, model access, billing, or SMTP delivery.',
   );

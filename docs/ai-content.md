@@ -1,4 +1,4 @@
-# Lexical generation and dictionary references
+# Lexical generation and external references
 
 ## Original content
 
@@ -10,16 +10,12 @@ The default model is `gpt-5.6-terra`; `OPENAI_MODEL` can explicitly override it.
 
 Validation requires meanings, examples, scenario, practical guidance, register, sensitivity, distinctions, collocations, family/patterns, memory hook and four exercise categories, and checks answer indices. It cannot guarantee factual/lexical truth. Users inspect a generated preview before saving; only then is a private user-word association created. Notes and schedules never become canonical content.
 
-## Cambridge
+## External dictionary link
 
-`lib/dictionary` defines a separate provider, schema and result contract. The optional API calls only official Cambridge endpoints with a server-side `accessKey` header. Default fallback is an ordinary external source link. Activation requires the API key, licensed dictionary code and operator-confirmed rights. Audio has a separate flag.
-
-The first matching entry is rendered unmodified in an isolated script-disabled frame. Additional entries are accessible through the source website. Definitions, examples, labels and IPA appear only when supplied. Missing audio never removes a valid entry. API status failures, malformed entries and unavailable pronunciation have graceful fallbacks. Invalid external canonical URLs are rejected.
-
-Cambridge content is transient: no database, local-storage, export, service-worker or AI reuse. Both network requests and route responses use `no-store`; audio does not preload. Actual attribution/branding and playback rights must be reviewed against the operator's signed agreement before activation. The README supplies the current registration/licensing steps.
+Word cards provide a normal link to the public Cambridge Dictionary page for the word. There is no dictionary provider, API route, key, embedded dictionary content, or dictionary audio in LexiLoop. Following the link leaves the app and lets the browser load Cambridge's website directly.
 
 ## Development
 
 `npm run dev:demo` explicitly selects the device demo. The mock provider only supplies the original starter lessons and cannot generate arbitrary words. Both demo and mock selection are disabled by `NODE_ENV=production`. Missing production AI configuration fails clearly; it never substitutes a mock response.
 
-Sources: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Cambridge specification](https://dictionary-api.cambridge.org/api/specification), [Cambridge FAQ](https://dictionary-api.cambridge.org/api/faq), [Cambridge terms](https://dictionary-api.cambridge.org/api/terms-and-conditions). Setup details and license limitations are in the README.
+Source: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs). Setup details are in the README.

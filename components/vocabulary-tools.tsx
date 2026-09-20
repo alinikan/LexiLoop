@@ -123,7 +123,7 @@ const situations = [
 ];
 export function UseTogether() {
   const { state, catalog, dispatch, busy, notify } = useStore();
-  const choices = state.words.filter((w) => !w.archived);
+  const choices = state.words.filter((w) => !w.archived && !w.known);
   const [selected, setSelected] = useState<string[]>([]),
     [text, setText] = useState(''),
     [situation, setSituation] = useState(situations[0]),

@@ -3,13 +3,14 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { workspace } from '@/lib/practice';
-import { ArrowRight, Plus, Check, Sparkles } from 'lucide-react';
+import { ArrowRight, Plus, Check, Sparkles, BadgeCheck } from 'lucide-react';
 import { useStore } from '../store';
 import { WordDetail } from './detail';
 import type { Word } from '@/lib/ai/schemas';
 import { todaySet } from '@/lib/domain';
+import { comparableWord, inputWordSchema, suggestWord } from '@/lib/validation/word';
 export function AddWord() {
-  const { state, generate, dispatch, busy, notify } = useStore();
+  const { state, catalog, generate, dispatch, busy, notify } = useStore();
   const params = useSearchParams();
   const capture = workspace(state).inbox.find((c) => c.id === params.get('capture'));
   const [input, setInput] = useState(capture?.word ?? ''),
@@ -18,17 +19,65 @@ export function AddWord() {
     [tag, setTag] = useState(''),
     [priority, setPriority] = useState(false),
     [word, setWord] = useState<Word | null>(null),
+    [suggestion, setSuggestion] = useState<Word | null>(null),
+    [lookupMessage, setLookupMessage] = useState(''),
     [loading, setLoading] = useState(false),
     [error, setError] = useState('');
   const existing = state.words.find((w) => w.word === word?.word),
     today = todaySet(state);
+  const parsedInput = inputWordSchema.safeParse(input);
+  const inputCard = parsedInput.success
+    ? catalog.find(
+        (candidate) => comparableWord(candidate.word) === comparableWord(parsedInput.data),
+      )
+    : undefined;
+  const inputSaved = inputCard
+    ? state.words.find((saved) => saved.word === inputCard.word)
+    : undefined;
   async function build(e: FormEvent) {
     e.preventDefault();
+    await buildWord(false);
+  }
+  async function buildWord(keepTypedWord: boolean) {
     setLoading(true);
     setError('');
     setWord(null);
+    setLookupMessage('');
     try {
-      setWord(await generate(input));
+      const normalized = inputWordSchema.parse(input);
+      const exact = catalog.find(
+        (candidate) => comparableWord(candidate.word) === comparableWord(normalized),
+      );
+      if (exact) {
+        setInput(exact.word);
+        setWord(exact);
+        setSuggestion(null);
+        setLookupMessage(
+          state.words.some((saved) => saved.word === exact.word)
+            ? 'This word is already in My Words.'
+            : 'This word already exists in the LexiLoop library. Here is its card.',
+        );
+        return;
+      }
+      if (!keepTypedWord) {
+        const suggested = suggestWord(
+          normalized,
+          catalog.map((candidate) => candidate.word),
+        );
+        if (suggested) {
+          setSuggestion(catalog.find((candidate) => candidate.word === suggested) ?? null);
+          return;
+        }
+      }
+      const result = await generate(normalized);
+      const generated = result.word;
+      setInput(generated.word);
+      setSuggestion(null);
+      setWord(generated);
+      if (result.existing)
+        setLookupMessage('This word already exists in LexiLoop. Here is its saved card.');
+      else if (generated.word !== normalized)
+        setLookupMessage(`Built the card as “${generated.word}”.`);
     } catch (e) {
       setError(
         e instanceof Error
@@ -85,12 +134,49 @@ export function AddWord() {
               onChange={(e) => {
                 setInput(e.target.value);
                 setWord(null);
+                setSuggestion(null);
+                setLookupMessage('');
               }}
               placeholder="e.g. reluctant"
               autoCapitalize="none"
               autoCorrect="off"
             />
           </label>
+          {inputSaved && (
+            <p className="field-note success" role="status">
+              <Check size={16} /> “{inputCard?.word}” is already in My Words.
+              <Link href={`/collection?word=${encodeURIComponent(inputCard!.word)}`}>Open it</Link>
+            </p>
+          )}
+          {!inputSaved && inputCard && (
+            <p className="field-note" role="status">
+              “{inputCard.word}” already exists in LexiLoop. Build the card to preview it—no new
+              generation is needed.
+            </p>
+          )}
+          {suggestion && (
+            <div className="suggestion-box" role="status">
+              <strong>Did you mean “{suggestion.word}”?</strong>
+              <p>{suggestion.meanings[0].definition}</p>
+              <div className="inline-actions">
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setInput(suggestion.word);
+                    setWord(suggestion);
+                    setLookupMessage('Using the suggested spelling.');
+                    setSuggestion(null);
+                  }}
+                >
+                  Yes, use {suggestion.word}
+                </button>
+                <button type="button" className="text-link" onClick={() => void buildWord(true)}>
+                  Keep “{input}”
+                </button>
+              </div>
+            </div>
+          )}
           <label>
             Where did you find it? <span>Optional note</span>
             <textarea
@@ -165,23 +251,41 @@ export function AddWord() {
                   )}
                 </div>
               )}
-              <WordDetail word={word} />
-              {!existing && (
-                <div className="sticky-actions">
-                  <button className="button" disabled={busy} onClick={() => void save(false)}>
-                    Save to my words
-                    <ArrowRight size={18} />
-                  </button>
-                  <button
-                    className="button secondary"
-                    disabled={busy || today.started || today.words.length >= today.goal}
-                    onClick={() => void save(true)}
-                  >
-                    <Plus size={18} />
-                    Save & add to today
-                  </button>
-                </div>
+              {lookupMessage && (
+                <p className="notice" role="status">
+                  {lookupMessage}
+                </p>
               )}
+              <WordDetail word={word} />
+              <div className="sticky-actions">
+                {!existing && (
+                  <>
+                    <button className="button" disabled={busy} onClick={() => void save(false)}>
+                      Save to my words
+                      <ArrowRight size={18} />
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={busy || today.started || today.words.length >= today.goal}
+                      onClick={() => void save(true)}
+                    >
+                      <Plus size={18} />
+                      Save & add to today
+                    </button>
+                  </>
+                )}
+                <button
+                  className="button quiet"
+                  disabled={busy || !!existing?.known}
+                  onClick={async () => {
+                    if (await dispatch({ type: 'know', word: word.word, source: 'personal' }))
+                      notify('Moved to Already know. This word will stay out of exercises.');
+                  }}
+                >
+                  <BadgeCheck size={18} />
+                  {existing?.known ? 'Already in your known words' : 'I already know this word'}
+                </button>
+              </div>
             </>
           ) : (
             <div className="empty-state">

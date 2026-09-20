@@ -37,7 +37,7 @@ const guides: Record<string, Guide> = {
       ],
       [
         'Today or later?',
-        'Add to today fills an available daily slot. The bookmark saves a suggested word for later. The dismiss icon marks a suggestion as not interesting to you.',
+        'Open any card to read its full meaning and real-life examples. Add to today fills an available daily slot. The bookmark saves it for later. I know this moves it to Already know and keeps it out of exercises.',
       ],
       [
         'Ready to practice',
@@ -51,15 +51,15 @@ const guides: Record<string, Guide> = {
     steps: [
       [
         'Start with a word',
-        'Enter the word or short expression you want to learn. Add the sentence where you found it for your own reference, then choose Build word card. Only the word is used to generate the lesson; your notes stay private.',
+        'Enter the word or short expression you want to learn. LexiLoop recognizes common accent variants, warns about duplicates, and suggests a likely spelling when needed. Add the sentence where you found it for your own reference, then choose Build word card. Only the word is used to generate the lesson; your notes stay private.',
       ],
       [
         'Explore the card',
-        'Read the meaning and real-world examples. The speaker plays pronunciation when your browser supports it. Picture this helps you remember; Close, but different explains related words. Usage, combinations and sentence patterns help you use it naturally.',
+        'Read the meaning, real-world examples, and a situation where the word fits. The speaker plays pronunciation when your browser supports it. Close, but different explains related words. Usage, combinations and sentence patterns help you use it naturally.',
       ],
       [
         'Keep it in your wordbook',
-        'Save to my words keeps the card in your collection; Save & add to today also fills an available daily slot. Edit word returns to your input. Notes and tags organize your entry; Prioritize this word puts it near the top of future recommendations; you still choose your daily set. If a request fails, your input stays ready for another try.',
+        'Save to my words keeps the card in your collection; Save & add to today also fills an available daily slot. If you already feel confident, I already know this word keeps it in a separate list and out of exercises. Edit word returns to your input. Notes, tags, and Prioritize this word personalize future recommendations.',
       ],
     ],
   },
@@ -69,7 +69,7 @@ const guides: Record<string, Guide> = {
     steps: [
       [
         'Meet the word',
-        'Meet every selected new word before any exercises. Read the definition and examples, open the original mini-scene, and use the speaker to hear the word. Then exercises mix new words with every active word learned earlier.',
+        'Meet every selected new word before any exercises. Read the definition, real-life examples, and usage guidance, and use the speaker to hear the word. Then exercises mix new words with every active word learned earlier.',
       ],
       [
         'Try before checking',

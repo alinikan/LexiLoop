@@ -16,6 +16,7 @@ Settings are tied to the account profile. New Auth users receive a profile throu
 - Selected unfinished words are protected from timezone edits that change the calendar date.
 - A started session carries its original daily-set date through midnight. Actual practice events use the local date of completion; review instants remain UTC.
 - Completed words persist before advancing; unfinished interactions restart if the page is left.
+- Words marked as already known stay in the personal wordbook but are removed from pending sessions and excluded from selection, recommendations, review queues and memory totals until restored to practice.
 - Personal sentences use word-presence validation and self-assessment. They are not automatically graded for semantic correctness.
 - A malicious learner can misreport quality for their own practice. This is not a leaderboard, certification system or proof of educational achievement.
 
@@ -23,12 +24,12 @@ Settings are tied to the account profile. New Auth users receive a profile throu
 
 OpenAI receives only normalized vocabulary input. Canonical content and input-to-lemma aliases are shared; user notes/sentences are private. A word-generation lease reduces duplicate paid calls. Durable quotas bound attempts per user/day. Structured parse and semantic validation have a bounded retry, with no mock fallback in production.
 
-Cambridge is an independent provider. Licensed content is fetched only on explicit lookup, rendered verbatim in a sandbox without scripts, attributed, linked, and excluded from persistence/export/AI. Optional audio requires its separate operator license flag. Missing/invalid data leaves the original lesson usable.
+The Cambridge control is an ordinary external link. No dictionary provider or API exists in the application runtime.
 
 ## Offline and account boundaries
 
 The service worker allowlists public assets. It never caches private navigations or API/auth responses. Cold offline navigation gets a reconnect page. Offline writes fail rather than pretending to save. Demo persistence is allowed only in development and is visibly labeled. Production returns no mock provider even if old flags are supplied.
 
-Sign-out navigates out of the authenticated app and notifies other same-origin tabs to clear/revalidate their state. Restoring a page from browser back/forward cache triggers a fresh read. A 401 clears client learning state and returns to sign-in. Route modules are loaded on demand; fonts have local system fallbacks without a remote font service.
+Sign-out navigates out of the authenticated app and notifies other same-origin tabs to clear/revalidate their state. Restoring a page from browser back/forward cache triggers a fresh read. A 401 clears client learning state and returns to sign-in. The protected route group owns one persistent client store and shell, so navigation between sections reuses loaded account state. Fonts have local system fallbacks without a remote font service.
 
 The collection itself is still loaded for browsing/filtering and schedule counts; history transfer is bounded. For very large collections, cursor pagination and content-on-demand would be a further optimization, not a reason to silently truncate data.

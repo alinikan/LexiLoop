@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { appConfig } from '@/lib/config';
 import './globals.css';
 export const metadata: Metadata = {
@@ -17,8 +18,17 @@ export const viewport: Viewport = {
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <Script
+          id="lexiloop-theme"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var theme=localStorage.getItem('lexiloop.theme');if(!theme){var demo=JSON.parse(localStorage.getItem('lexiloop-demo-v1')||'null');theme=demo&&demo.state&&demo.state.settings&&demo.state.settings.dark?'dark':'light'}document.documentElement.dataset.theme=theme==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}})()`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

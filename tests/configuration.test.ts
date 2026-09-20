@@ -28,7 +28,7 @@ function run(overrides: Record<string, string> = {}, file = '', args: string[] =
     rmSync(cwd, { recursive: true, force: true });
   }
 }
-it('accepts the production origin without requiring DATABASE_URL or Cambridge', () => {
+it('accepts the production origin without requiring DATABASE_URL', () => {
   const result = run();
   expect(result.status).toBe(0);
   expect(result.stdout).not.toContain('private-fixture');

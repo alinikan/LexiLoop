@@ -1,6 +1,7 @@
 // Original vocabulary cards. Difficulty labels are editorial estimates.
 // Kept as a separate batch so extending the library does not change older exercises.
 export const moreWords = `
+touché|B2|interjection|used to acknowledge that someone has made a clever or effective point|Touché, your example proves that my rule needs an exception.|“You said you never check your phone at dinner.” “Touché,” Maya replied with a smile.|Conversation
 abate|C1|verb|to become less intense or severe|The noise should abate once the roadwork ends.|The storm began to abate just as the captain found her umbrella.
 aberrant|C1|adjective|departing from what is usual or expected|One aberrant result prompted us to check the equipment.|The robot's aberrant behavior began when it started collecting teacups.
 abject|C1|adjective|extreme and without relief, especially of a bad condition|The proposal ended in abject failure despite months of preparation.|The magician stared at the empty hat in abject disappointment.

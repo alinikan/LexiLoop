@@ -21,6 +21,7 @@ export type SavedWord = {
   priority: boolean;
   favorite: boolean;
   archived: boolean;
+  known?: boolean;
   addedAt: string;
   sentence: string;
   schedule: Schedule;
@@ -86,6 +87,8 @@ export type Command =
       reflection: 'ready' | 'revisit';
     }
   | { type: 'forget'; word: string }
+  | { type: 'know'; word: string; source?: 'personal' | 'suggested' }
+  | { type: 'practice-word'; word: string }
   | { type: 'settings'; settings: Settings }
   | {
       type: 'save';
@@ -169,6 +172,7 @@ export function applyCommand(
   const state = structuredClone(input),
     date = dayKey(now, state.settings.timezone);
   state.workspace ??= emptyWorkspace();
+  const workspace = state.workspace;
   const today =
     command.type === 'complete' && command.kind === 'learn' && command.day
       ? state.days.find((d) => d.date === command.day)
@@ -179,6 +183,25 @@ export function applyCommand(
     const saved = state.words.find((w) => w.word === word);
     if (!saved) throw new UserError('Save this word first.');
     return saved;
+  };
+  const removeFromPendingWork = (word: string) => {
+    for (const day of state.days) {
+      if (
+        (day.date === date || day.date === workspace.sessions.learn?.day) &&
+        day.words.includes(word) &&
+        !day.completed.includes(word)
+      ) {
+        day.words = day.words.filter((name) => name !== word);
+        if (day.started) day.goal = day.words.length;
+        if (!day.words.length) {
+          day.started = false;
+          day.goal = state.settings.goal;
+        }
+      }
+    }
+    for (const kind of ['learn', 'review'] as const) {
+      if (workspace.sessions[kind]?.words.includes(word)) delete workspace.sessions[kind];
+    }
   };
   switch (command.type) {
     case 'daily-plan': {
@@ -193,7 +216,7 @@ export function applyCommand(
         if (!catalog.some((w) => w.word === name))
           throw new UserError('Build the word card first.');
         const saved = state.words.find((w) => w.word === name);
-        if (saved?.archived || saved?.schedule.firstLearned)
+        if (saved?.archived || saved?.known || saved?.schedule.firstLearned)
           throw new UserError('Choose active, unlearned words.');
         if (!saved)
           state.words.push({
@@ -205,6 +228,7 @@ export function applyCommand(
             priority: false,
             favorite: false,
             archived: false,
+            known: false,
             addedAt: now.toISOString(),
             sentence: '',
             schedule: freshSchedule(),
@@ -217,31 +241,50 @@ export function applyCommand(
     case 'forget': {
       lookup(command.word);
       state.words = state.words.filter((w) => w.word !== command.word);
-      for (const day of state.days) {
-        if (
-          (day.date === date || day.date === state.workspace.sessions.learn?.day) &&
-          day.words.includes(command.word) &&
-          !day.completed.includes(command.word)
-        ) {
-          day.words = day.words.filter((w) => w !== command.word);
-          if (day.started) day.goal = day.words.length;
-          if (!day.words.length) {
-            day.started = false;
-            day.goal = state.settings.goal;
-          }
-        }
+      removeFromPendingWork(command.word);
+      break;
+    }
+    case 'know': {
+      if (!catalog.some((word) => word.word === command.word))
+        throw new UserError('Build the word card first.');
+      let saved = state.words.find((word) => word.word === command.word);
+      if (!saved) {
+        saved = {
+          word: command.word,
+          source: command.source ?? 'suggested',
+          note: '',
+          context: '',
+          tag: '',
+          priority: false,
+          favorite: false,
+          archived: false,
+          known: true,
+          addedAt: now.toISOString(),
+          sentence: '',
+          schedule: freshSchedule(),
+        };
+        state.words.push(saved);
       }
-      for (const kind of ['learn', 'review'] as const) {
-        if (state.workspace.sessions[kind]?.words.includes(command.word))
-          delete state.workspace.sessions[kind];
-      }
+      saved.known = true;
+      saved.archived = false;
+      removeFromPendingWork(command.word);
+      break;
+    }
+    case 'practice-word': {
+      const saved = lookup(command.word);
+      saved.known = false;
+      saved.archived = false;
       break;
     }
     case 'checkpoint': {
       const draft = command.draft;
       for (const name of draft.words) {
         const saved = lookup(name);
-        if (saved.archived || (draft.kind === 'review' && !saved.schedule.firstLearned))
+        if (
+          saved.archived ||
+          saved.known ||
+          (draft.kind === 'review' && !saved.schedule.firstLearned)
+        )
           throw new UserError('This session contains an unavailable word.');
       }
       if (draft.kind === 'learn') {
@@ -345,6 +388,7 @@ export function applyCommand(
         priority: command.priority ?? false,
         favorite: false,
         archived: false,
+        known: false,
         addedAt: now.toISOString(),
         sentence: '',
         schedule: freshSchedule(),
@@ -362,7 +406,7 @@ export function applyCommand(
     case 'select': {
       const saved = lookup(command.word);
       if (today.started) throw new UserError('Your lesson has started. Today’s set is locked.');
-      if (saved.archived || saved.schedule.firstLearned)
+      if (saved.archived || saved.known || saved.schedule.firstLearned)
         throw new UserError('Choose an unlearned, active word.');
       if (today.words.includes(command.word)) throw new UserError('Already selected for today.');
       if (today.words.length >= today.goal)
@@ -384,7 +428,8 @@ export function applyCommand(
     case 'complete': {
       if (state.events.some((e) => e.id === command.id)) return input;
       const saved = lookup(command.word);
-      if (saved.archived) throw new UserError('Restore this word before reviewing.');
+      if (saved.archived || saved.known)
+        throw new UserError('Move this word back to practice before reviewing.');
       if (command.kind === 'learn') {
         if (!today.started || !today.words.includes(command.word))
           throw new UserError('Start today’s lesson first.');
@@ -473,11 +518,14 @@ export function applyCommand(
 }
 export function dueWords(state: State, now = new Date()) {
   return state.words
-    .filter((w) => !w.archived && w.schedule.nextReview && new Date(w.schedule.nextReview) <= now)
+    .filter(
+      (w) =>
+        !w.archived && !w.known && w.schedule.nextReview && new Date(w.schedule.nextReview) <= now,
+    )
     .sort((a, b) => a.schedule.nextReview!.localeCompare(b.schedule.nextReview!));
 }
 export function metrics(state: State, now = new Date()) {
-  const learned = state.words.filter((w) => w.schedule.firstLearned);
+  const learned = state.words.filter((w) => !w.known && w.schedule.firstLearned);
   const dates = [...new Set(state.events.map((e) => e.date))].sort();
   let longest = 0,
     run = 0,

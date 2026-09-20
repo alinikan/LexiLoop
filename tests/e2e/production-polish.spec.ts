@@ -15,6 +15,13 @@ for (const width of [320, 375, 390, 393, 414, 430, 768, 1440]) {
     expect(ring!.x + ring!.width).toBeLessThanOrEqual(hero!.x + hero!.width);
     expect(ring!.y).toBeGreaterThanOrEqual(hero!.y);
     expect(ring!.y + ring!.height).toBeLessThanOrEqual(hero!.y + hero!.height);
+    const label = await page.locator('.loop-visual small').boundingBox();
+    if (label) {
+      expect(label.x).toBeGreaterThanOrEqual(ring!.x + ring!.width * 0.12);
+      expect(label.x + label.width).toBeLessThanOrEqual(ring!.x + ring!.width * 0.88);
+      expect(label.y).toBeGreaterThanOrEqual(ring!.y + ring!.height * 0.12);
+      expect(label.y + label.height).toBeLessThanOrEqual(ring!.y + ring!.height * 0.88);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -31,9 +38,7 @@ test('three personal and two suggested words finish a daily loop and due review 
     await page.goto('/add');
     await page.getByLabel('What’s the word?').fill(word);
     await page.getByRole('button', { name: 'Build word card' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Cambridge Dictionary', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open in Cambridge Dictionary/ })).toBeVisible();
     await page.getByRole('button', { name: 'Save & add to today' }).click();
     await expect(page.getByText('This word is already in your collection.')).toBeVisible();
   }
@@ -68,14 +73,18 @@ test('three personal and two suggested words finish a daily loop and due review 
   const reviewWord = learned.words.toSorted((a, b) =>
     a.schedule.nextReview!.localeCompare(b.schedule.nextReview!),
   )[0].word;
-  const application = catalog
-    .find((w) => w.word === reviewWord)!
-    .exercises.find((e) => e.type === 'application')!;
-  await page.locator('.answer-options button').nth(application.answer).click();
-  await page.getByRole('button', { name: 'Check answer' }).click();
+  const context = catalog
+    .find((word) => word.word === reviewWord)!
+    .exercises.find((exercise) => exercise.type === 'context')!;
+  if (await page.getByLabel('Type the word').isVisible()) {
+    await page.getByLabel('Type the word').fill(reviewWord);
+  } else {
+    await page.locator('.answer-options button').nth(context.answer).click();
+  }
+  await page.getByRole('button', { name: 'Check answer', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('I know it well').check();
-  await page.getByRole('button', { name: 'Save & continue' }).click();
+  await page.getByRole('button', { name: 'Save & continue', exact: true }).click();
   await page.reload();
   const reviewed = await read();
   expect(reviewed.events).toHaveLength(6);
@@ -118,8 +127,14 @@ test('narrow phone screens support forms, dark mode and all navigation without o
   await page.getByLabel('Dark appearance').check();
   await page.getByLabel('Reduce motion', { exact: true }).check();
   await page.getByRole('button', { name: 'Save settings', exact: true }).click();
-  await page.goto('/');
+  await page.locator('.bottom-nav').getByRole('link', { name: 'Today' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduce');
+  await expect(page.getByText(/Opening your word/i)).toHaveCount(0);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.locator('body').evaluate((body) => getComputedStyle(body).backgroundColor)).toBe(
+    'rgb(20, 24, 39)',
+  );
   expect(errors).toEqual([]);
 });

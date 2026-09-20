@@ -13,7 +13,7 @@ export const wordSchema = z.object({
   difficulty: z.enum(['A2', 'B1', 'B2', 'C1']),
   usefulness: z.number().int().min(1).max(100),
   categories: z.array(z.string().max(40)).min(1).max(5),
-  register: z.string().max(120),
+  register: z.string().max(300),
   sensitive: z.boolean(),
   meanings: z
     .array(

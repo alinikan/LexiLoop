@@ -1,8 +1,8 @@
 # Deployment and operations
 
-The existing app is [lexiloop-ali.vercel.app](https://lexiloop-ali.vercel.app), deployed from [alinikan/LexiLoop](https://github.com/alinikan/LexiLoop). Gmail SMTP is configured in Supabase for private use; Cambridge remains optional and disabled.
+The existing app is [lexiloop-ali.vercel.app](https://lexiloop-ali.vercel.app), deployed from [alinikan/LexiLoop](https://github.com/alinikan/LexiLoop). Gmail SMTP is configured in Supabase for private use.
 
-The **README is the complete, current setup manual**. Follow it for Supabase, SMTP, OpenAI, Cambridge, GitHub, Vercel and iPhone installation. This document records operational behavior rather than duplicating environment instructions.
+The **README is the complete, current setup manual**. Follow it for Supabase, SMTP, OpenAI, GitHub, Vercel and iPhone installation. This document records operational behavior rather than duplicating environment instructions.
 
 - Install with `npm ci`, use Node 24, and keep the lockfile.
 - Initialize a new database with `npm run db:migrate` and `npm run db:seed`. Existing installations apply only new migrations.
@@ -15,7 +15,7 @@ The **README is the complete, current setup manual**. Follow it for Supabase, SM
 
 ## Failure and recovery
 
-A failed progress write leaves the current exercise available for retry; idempotency prevents duplicate awards. A revision conflict asks the learner to reload. An AI failure preserves the typed form and never falls back to mocks. A failed Cambridge lookup preserves the lesson and source link. Cold offline navigation gives reconnect guidance; private responses are not cached.
+A failed progress write leaves the current exercise available for retry; idempotency prevents duplicate awards. A revision conflict asks the learner to reload. An AI failure preserves the typed form and never falls back to mocks. Cold offline navigation gives reconnect guidance; private responses are not cached.
 
 Supabase authentication links depend on Site URL, allowed redirects and templates. For support, inspect Auth and SMTP-provider logs without publishing tokens, passwords or private sentences. Keys accidentally exposed must be rotated with their provider, then updated in the relevant environment and redeployed.
 

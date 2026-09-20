@@ -10,6 +10,12 @@ test('search crosses both sources and settings actually filter recommendations',
   await page.goto('/suggested');
   await expect(page.locator('.word-meta').first()).toContainText('B1');
   await page.getByLabel('Find a word across suggested and saved words').fill('obfuscate');
+  await page.locator('.discovery-open').click();
+  await expect(
+    page.getByRole('heading', { name: 'Meaning, examples, and real-life use' }),
+  ).toBeVisible();
+  await expect(page.getByText('Our Simple Explanation')).toBeVisible();
+  await page.getByRole('button', { name: 'Close word details' }).click();
   await page.getByRole('button', { name: 'Save obfuscate for later' }).click();
   await expect(page.getByRole('heading', { name: 'obfuscate', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'In My Saved Words' })).toBeVisible();
@@ -23,8 +29,8 @@ test('search crosses both sources and settings actually filter recommendations',
   for (const meta of await page.locator('.word-meta').all()) await expect(meta).toContainText('C1');
   await expect(page.getByRole('button', { name: 'Show more words' })).toBeVisible();
   await page.goto('/collection?word=obfuscate');
-  await page.getByText('Picture it on screen · an original mini-scene', { exact: true }).click();
-  await expect(page.getByText(/An original fictional scene/)).toBeVisible();
+  await expect(page.getByText('Picture it on screen · an original mini-scene')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Out in the real world' }).first()).toBeVisible();
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Remove from My Words', exact: true }).click();
   await page.reload();
@@ -110,7 +116,7 @@ test('an expanded library card can be found, learned, and saved', async ({ page 
   await page.getByRole('combobox').selectOption('1');
   await page.getByRole('button', { name: 'Let’s begin' }).click();
   await page.goto('/suggested');
-  await expect(page.getByText(/library of 400 words/)).toBeVisible();
+  await expect(page.getByText(/library of 401 words/)).toBeVisible();
   await page.getByLabel('Find a word across suggested and saved words').fill('equanimity');
   await expect(page.getByRole('heading', { name: 'equanimity', exact: true })).toBeVisible();
   await expect(
@@ -130,4 +136,29 @@ test('an expanded library card can be found, learned, and saved', async ({ page 
     state.words.find((w: { word: string }) => w.word === 'equanimity').schedule.firstLearned,
   ).toBeTruthy();
   expect(state.events).toHaveLength(1);
+});
+
+test('accent variants, spelling suggestions, duplicate notices, and known words work together', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await page.goto('/add');
+  await page.getByLabel('What’s the word?').fill('Touche');
+  await expect(page.getByText(/“touché” already exists in LexiLoop/)).toBeVisible();
+  await page.getByRole('button', { name: 'Build word card' }).click();
+  await expect(page.getByRole('heading', { name: 'touché', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save to my words' }).click();
+  await page.goto('/add');
+  await page.getByLabel('What’s the word?').fill('Touche');
+  await expect(page.getByText(/already in My Words/)).toBeVisible();
+  await page.getByLabel('What’s the word?').fill('relucatnt');
+  await page.getByRole('button', { name: 'Build word card' }).click();
+  await expect(page.getByText('Did you mean “reluctant”?')).toBeVisible();
+  await page.getByRole('button', { name: 'Yes, use reluctant' }).click();
+  await expect(page.getByRole('heading', { name: 'reluctant', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'I already know this word' }).click();
+  await page.goto('/collection');
+  await page.getByRole('combobox', { name: 'Filter collection' }).selectOption('Already know');
+  await expect(page.getByRole('button', { name: 'View reluctant' })).toBeVisible();
 });

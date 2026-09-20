@@ -14,7 +14,7 @@ export function ResumeSession({
   const valid = draft.words.every(
     (name) =>
       catalog.some((w) => w.word === name) &&
-      state.words.some((w) => w.word === name && !w.archived),
+      state.words.some((w) => w.word === name && !w.archived && !w.known),
   );
   return (
     <section className="panel resume-panel" aria-label="Saved session">

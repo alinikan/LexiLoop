@@ -78,10 +78,6 @@ const child = spawn(
       MOCK_AI: 'true',
       AI_PROVIDER: 'mock',
       DATABASE_URL: '',
-      CAMBRIDGE_API_KEY: '',
-      CAMBRIDGE_DICTIONARY_CODE: '',
-      CAMBRIDGE_LICENSE_CONFIRMED: 'false',
-      CAMBRIDGE_AUDIO_LICENSE_CONFIRMED: 'false',
     },
   },
 );

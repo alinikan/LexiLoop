@@ -1,6 +1,6 @@
 # Repository maintenance audit — 2026-09-13
 
-This audit updates the existing repository and deployment documentation. The starting local commit and GitHub HEAD were both `7d9f8d8175449c1b10ddc2454e834b4c6317ff30`. The checkout was clean before changes. Next.js/Supabase, real accounts, Gmail SMTP for private use, configurable OpenAI generation and optional Cambridge integration remain the architecture.
+This audit updates the existing repository and deployment documentation. The starting local commit and GitHub HEAD were both `7d9f8d8175449c1b10ddc2454e834b4c6317ff30`. The checkout was clean before changes. Next.js/Supabase, real accounts, Gmail SMTP for private use and configurable OpenAI generation remain the architecture.
 
 ## Changes and decisions
 
@@ -18,7 +18,7 @@ This audit updates the existing repository and deployment documentation. The sta
 
 ## Important distinctions
 
-`SUPABASE_SECRET_KEY` was already correct; no old environment alias was reintroduced. The real local file already selected localhost, real accounts, OpenAI and `gpt-5.6-terra`, with Cambridge disabled. It was not rewritten.
+`SUPABASE_SECRET_KEY` was already correct; no old environment alias was reintroduced. The real local file already selected localhost, real accounts, OpenAI and `gpt-5.6-terra`. It was not rewritten.
 
 SiteURL-based confirmation templates always return to the project's Site URL. The README instead documents RedirectTo-based links matching the exact signup/recovery URLs supplied by the code, so a shared Supabase project can return local requests locally. Existing SiteURL templates are explained as a valid production-only destination choice. Dashboard templates were not changed by these repository edits.
 

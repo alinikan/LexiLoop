@@ -1,6 +1,6 @@
 # Maintenance direction
 
-LexiLoop already has a GitHub repository and Vercel deployment. Keep the Next.js/Supabase architecture, real accounts, Gmail SMTP for private use and configurable OpenAI generation. Cambridge remains optional.
+LexiLoop already has a GitHub repository and Vercel deployment. Keep the Next.js/Supabase architecture, real accounts, Gmail SMTP for private use and configurable OpenAI generation. Dictionary references remain ordinary external links.
 
 The [README](../README.md) is the setup guide. [Architecture](architecture.md) explains implementation invariants. [Production audit](production-audit.md) records the current maintenance changes, and [verification](verification.md) separates local evidence from hosted-service acceptance checks.
 

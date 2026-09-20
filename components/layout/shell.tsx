@@ -117,8 +117,10 @@ export function Shell({ children }: { children: ReactNode }) {
           {ready
             ? children
             : !error && (
-                <div className="loading">
-                  <span className="spinner" /> Opening your wordbook…
+                <div className="app-skeleton" aria-label="Loading your wordbook" role="status">
+                  <span />
+                  <span />
+                  <span />
                 </div>
               )}
         </main>

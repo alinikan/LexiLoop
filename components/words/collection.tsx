@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Star, ArrowLeft, ArrowRight, Plus } from 'lucide-react';
+import { Search, Star, ArrowLeft, ArrowRight, Plus, BadgeCheck } from 'lucide-react';
 import { useStore } from '../store';
 import { ContextTip } from '../tutorial';
 import { WordDetail } from './detail';
@@ -46,6 +46,24 @@ function WordEditor({ saved, onClose }: { saved: SavedWord; onClose: () => void 
             history. Archive it instead if you may want to restore its notes later.
           </ContextTip>
           <div className="inline-actions">
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={async () => {
+                const changed = saved.known
+                  ? await dispatch({ type: 'practice-word', word: saved.word })
+                  : await dispatch({ type: 'know', word: saved.word });
+                if (changed)
+                  notify(
+                    saved.known
+                      ? 'This word can appear in practice again.'
+                      : 'Moved to Already know. It will stay out of exercises.',
+                  );
+              }}
+            >
+              <BadgeCheck size={17} />
+              {saved.known ? 'Move to practice words' : 'I already know this word'}
+            </button>
             <button
               className="button secondary"
               disabled={busy}
@@ -101,7 +119,7 @@ function WordEditor({ saved, onClose }: { saved: SavedWord; onClose: () => void 
               <Star size={17} />
               {saved.favorite ? 'Unfavorite' : 'Favorite'}
             </button>
-            {saved.schedule.firstLearned && !saved.archived && (
+            {saved.schedule.firstLearned && !saved.archived && !saved.known && (
               <Link
                 href={`/review?word=${encodeURIComponent(saved.word)}`}
                 className="button secondary"
@@ -208,16 +226,18 @@ export function Collection() {
       if (filter === 'Archived') return w.archived;
       if (w.archived) return false;
       switch (filter) {
+        case 'Already know':
+          return !!w.known;
         case 'Saved':
-          return !w.schedule.firstLearned;
+          return !w.known && !w.schedule.firstLearned;
         case 'Learning':
-          return w.schedule.firstLearned && w.schedule.interval < 7;
+          return !w.known && w.schedule.firstLearned && w.schedule.interval < 7;
         case 'Learned':
-          return !!w.schedule.firstLearned;
+          return !w.known && !!w.schedule.firstLearned;
         case 'Mastered':
-          return w.schedule.interval >= 30 && w.schedule.confidence >= 3;
+          return !w.known && w.schedule.interval >= 30 && w.schedule.confidence >= 3;
         case 'Needs practice':
-          return w.schedule.lapses > 0 && w.schedule.streak < 2;
+          return !w.known && w.schedule.lapses > 0 && w.schedule.streak < 2;
         case 'Favorites':
           return w.favorite;
         case 'Added by me':
@@ -265,6 +285,7 @@ export function Collection() {
         <select id="collection-filter" value={filter} onChange={(e) => setFilter(e.target.value)}>
           {[
             'All words',
+            'Already know',
             'Saved',
             'Learning',
             'Learned',
@@ -295,11 +316,13 @@ export function Collection() {
               <span>{catalog.find((c) => c.word === w.word)?.meanings[0].definition}</span>
               <small>
                 {w.tag || w.source} ·{' '}
-                {w.schedule.firstLearned
-                  ? w.schedule.interval >= 30 && w.schedule.confidence >= 3
-                    ? 'Mastered'
-                    : 'Learning'
-                  : 'Saved for later'}
+                {w.known
+                  ? 'Already know'
+                  : w.schedule.firstLearned
+                    ? w.schedule.interval >= 30 && w.schedule.confidence >= 3
+                      ? 'Mastered'
+                      : 'Learning'
+                    : 'Saved for later'}
               </small>
             </button>
             <button

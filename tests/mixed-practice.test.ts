@@ -163,7 +163,7 @@ it('the second expansion supplies complete examples and distinct exercise choice
     .trim()
     .split('\n')
     .map((line) => line.split('|')[0]);
-  expect(names).toHaveLength(176);
+  expect(names).toHaveLength(177);
   expect(new Set(names).size).toBe(names.length);
   for (const name of names) {
     const word = catalog.find((w) => w.word === name)!;
@@ -171,5 +171,8 @@ it('the second expansion supplies complete examples and distinct exercise choice
     for (const example of word.meanings[0].examples) expect(containsWord(example, name)).toBe(true);
     for (const exercise of word.exercises)
       expect(new Set(exercise.options).size).toBe(exercise.options.length);
+    expect(word.exercises.find((exercise) => exercise.type === 'context')?.prompt).toContain(
+      '_____',
+    );
   }
 });

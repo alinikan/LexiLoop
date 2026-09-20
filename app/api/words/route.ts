@@ -18,7 +18,10 @@ export async function POST(request: Request) {
     const { word } = z.object({ word: inputWordSchema }).parse(await readJson(request, 1000));
     const seed = catalog.find((w) => w.word === word);
     if (seed)
-      return NextResponse.json({ word: seed }, { headers: { 'Cache-Control': 'no-store' } });
+      return NextResponse.json(
+        { word: seed, existing: true },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     const db = adminClient();
     const { data: alias, error: aliasError } = await db
       .from('word_aliases')
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
     if (error) throw new UserError('Word storage is unavailable. Please try again.');
     if (cached)
       return NextResponse.json(
-        { word: validateWord(cached.content) },
+        { word: validateWord(cached.content), existing: true },
         { headers: { 'Cache-Control': 'no-store' } },
       );
     const token = crypto.randomUUID();
@@ -65,7 +68,7 @@ export async function POST(request: Request) {
       if (freshError) throw new UserError('Word storage is unavailable. Please retry.');
       if (fresh)
         return NextResponse.json(
-          { word: validateWord(fresh.content) },
+          { word: validateWord(fresh.content), existing: true },
           { headers: { 'Cache-Control': 'no-store' } },
         );
       const { data: allowed, error: rateError } = await db.rpc('consume_generation_quota', {
@@ -81,7 +84,10 @@ export async function POST(request: Request) {
       const generated = await provider.generate(word);
       generated.word = inputWordSchema.parse(generated.word);
       const persisted = await cacheWord(generated, word);
-      return NextResponse.json({ word: persisted }, { headers: { 'Cache-Control': 'no-store' } });
+      return NextResponse.json(
+        { word: persisted, existing: false },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     } finally {
       await db.rpc('release_word_generation', { p_word: word, p_token: token });
     }

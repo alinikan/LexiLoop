@@ -24,10 +24,10 @@ export default function Privacy() {
         </p>
         <h2>Cambridge Dictionary</h2>
         <p>
-          When licensed lookup is enabled, your requested word is sent to Cambridge only when you
-          press the lookup button. Cambridge content is displayed separately, never sent to AI,
-          saved in your wordbook, or included in exports. External dictionary links open Cambridge’s
-          own website.
+          Word cards include an ordinary external link to Cambridge Dictionary. The app has no
+          Cambridge API integration and does not fetch, display, or store Cambridge content. If you
+          open the link, your browser sends the word in the page address directly to Cambridge’s
+          website under its own privacy terms.
         </p>
         <h2>Device demo</h2>
         <p>

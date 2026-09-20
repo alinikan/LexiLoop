@@ -81,7 +81,7 @@ it('rechecks the cache after claiming the lease', async () => {
 it('charges only the verified user and returns persisted canonical content', async () => {
   mocks.cacheWord.mockResolvedValue(catalog[0]);
   const response = await POST(request('unfathomable'));
-  expect(await response.json()).toEqual({ word: catalog[0] });
+  expect(await response.json()).toEqual({ word: catalog[0], existing: false });
   expect(mocks.rpc).toHaveBeenCalledWith('consume_generation_quota', { p_user: 'verified-user' });
   expect(mocks.cacheWord).toHaveBeenCalledWith(
     expect.objectContaining({ word: 'unfathomable' }),

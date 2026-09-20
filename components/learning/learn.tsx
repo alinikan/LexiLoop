@@ -60,7 +60,7 @@ export function Learn() {
                   ...new Set([
                     ...remaining,
                     ...state.words
-                      .filter((w) => !w.archived && w.schedule.firstLearned)
+                      .filter((w) => !w.archived && !w.known && w.schedule.firstLearned)
                       .map((w) => w.word),
                   ]),
                 ].map((w) => catalog.find((c) => c.word === w)!),

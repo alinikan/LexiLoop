@@ -1,22 +1,26 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Check, Bookmark, X, Search, ArrowRight } from 'lucide-react';
+import { Plus, Check, Bookmark, X, Search, ArrowRight, BadgeCheck } from 'lucide-react';
 import { ContextTip } from '../tutorial';
 import { useStore } from '../store';
 import { todaySet } from '@/lib/domain';
+import { comparableWord } from '@/lib/validation/word';
+import { WordDetail } from './detail';
 export function Discover() {
   const { state, catalog, dispatch, busy, notify } = useStore();
   const [filter, setFilter] = useState('For you'),
     [query, setQuery] = useState(''),
     [tab, setTab] = useState('Suggested'),
-    [limit, setLimit] = useState(24);
+    [limit, setLimit] = useState(24),
+    [selected, setSelected] = useState<string | null>(null);
+  const detail = useRef<HTMLElement>(null);
   const today = todaySet(state);
   const levels = ['A2', 'B1', 'B2', 'C1'];
   const words = catalog
     .filter((w) => {
       const saved = state.words.find((s) => s.word === w.word);
-      if (query.trim()) return w.word.includes(query.trim().toLowerCase());
+      if (query.trim()) return comparableWord(w.word).includes(comparableWord(query));
       return (
         !state.dismissed.includes(w.word) &&
         (filter === 'For you' || w.categories.includes(filter)) &&
@@ -53,6 +57,14 @@ export function Discover() {
       if (await dispatch({ type: 'select', word: name })) notify('Added to today’s wordlist.');
     } else notify('Saved to your wordbook.');
   }
+  async function know(name: string) {
+    if (await dispatch({ type: 'know', word: name, source: 'suggested' }))
+      notify('Moved to Already know. This word will stay out of exercises.');
+  }
+  useEffect(() => {
+    if (selected) detail.current?.focus();
+  }, [selected]);
+  const selectedWord = catalog.find((word) => word.word === selected);
   return (
     <>
       <div className="page-heading">
@@ -125,6 +137,29 @@ export function Discover() {
             : 'Your saved words, across every level.'}{' '}
         {words.length} results in a library of {catalog.length} words.
       </p>
+      {selectedWord && (
+        <section
+          className="panel discover-detail"
+          ref={detail}
+          tabIndex={-1}
+          aria-label={`${selectedWord.word} details`}
+        >
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">WORD PREVIEW</p>
+              <h2>Meaning, examples, and real-life use</h2>
+            </div>
+            <button
+              className="icon-button"
+              aria-label="Close word details"
+              onClick={() => setSelected(null)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <WordDetail word={selectedWord} />
+        </section>
+      )}
       <div className="discovery-grid">
         {words.slice(0, limit).map((word, i) => (
           <article className="discovery-card" key={word.word}>
@@ -141,7 +176,14 @@ export function Discover() {
                 </button>
               )}
             </div>
-            <h2>{word.word}</h2>
+            <button className="discovery-open" onClick={() => setSelected(word.word)}>
+              <h2>{word.word}</h2>
+              <span className="word-meta">
+                {word.partOfSpeech} <span>·</span> {word.difficulty} <span>·</span> Highly useful
+              </span>
+              <p>{word.meanings[0].definition}</p>
+              <span className="text-link">View meanings & examples</span>
+            </button>
             {state.words.some((s) => s.word === word.word) && (
               <Link
                 className="text-link"
@@ -150,10 +192,6 @@ export function Discover() {
                 In My Saved Words
               </Link>
             )}
-            <span className="word-meta">
-              {word.partOfSpeech} <span>·</span> {word.difficulty} <span>·</span> Highly useful
-            </span>
-            <p>{word.meanings[0].definition}</p>
             <div className="card-actions">
               <button
                 className="button secondary"
@@ -163,7 +201,8 @@ export function Discover() {
                   today.words.length >= today.goal ||
                   today.words.includes(word.word) ||
                   state.words.some(
-                    (s) => s.word === word.word && (s.archived || !!s.schedule.firstLearned),
+                    (s) =>
+                      s.word === word.word && (s.archived || s.known || !!s.schedule.firstLearned),
                   )
                 }
                 onClick={() => void add(word.word, true)}
@@ -181,6 +220,18 @@ export function Discover() {
                   <Bookmark size={20} />
                 </button>
               )}
+              <button
+                className="button quiet"
+                disabled={
+                  busy || state.words.some((saved) => saved.word === word.word && saved.known)
+                }
+                onClick={() => void know(word.word)}
+              >
+                <BadgeCheck size={17} />
+                {state.words.some((saved) => saved.word === word.word && saved.known)
+                  ? 'Already know'
+                  : 'I know this'}
+              </button>
             </div>
           </article>
         ))}

@@ -6,7 +6,7 @@ LexiLoop helps you expand your vocabulary and use new words naturally in everyda
 
 [Open LexiLoop](https://lexiloop-ali.vercel.app) · [Source repository](https://github.com/alinikan/LexiLoop)
 
-The current deployment is a small private app hosted on Vercel, with real Supabase accounts, Gmail SMTP delivery through Supabase, and OpenAI lesson generation using `gpt-5.6-terra`. Cambridge API integration is optional and disabled by default. A custom domain, Resend account, and Vercel Marketplace database integration are not required.
+The current deployment is a small private app hosted on Vercel, with real Supabase accounts, Gmail SMTP delivery through Supabase, and OpenAI lesson generation using `gpt-5.6-terra`. A custom domain, Resend account, and Vercel Marketplace database integration are not required.
 
 ## Contents
 
@@ -17,7 +17,7 @@ The current deployment is a small private app hosted on Vercel, with real Supaba
 - [Supabase database and authentication](#supabase-database-and-authentication)
 - [Gmail SMTP and email templates](#gmail-smtp-and-email-templates)
 - [OpenAI setup and generation](#openai-setup-and-generation)
-- [Optional Cambridge reference](#optional-cambridge-reference)
+- [External dictionary link](#external-dictionary-link)
 - [New vocabulary tools and upgrade steps](#vocabulary-experience-recommendations-recall-and-everyday-use)
 - [Vercel deployment](#vercel-deployment)
 - [Testing](#testing)
@@ -33,11 +33,13 @@ Choose a daily goal (five words by default, configurable from one to twenty). Pr
 
 New learning sessions first introduce every selected new word, then interleave exercises across those words and every active previously learned word. Exercises cover meaning, context, distinctions, typed recall, personal sentences, application and confidence; earlier words receive recall and context plus extra tasks for weak skills. Existing saved sessions retain their original flow until finished or discarded. Personal sentences are checked for the word's presence and self-assessed; the app does not send them to AI for grading. Review sessions use recall, context and confidence. Wrong answers bring a word back in ten minutes; successful reviews gradually increase the interval. Quick review covers up to five due words and full review up to thirty. You can also practice a learned word early.
 
-The wordbook supports notes, original context, tags, priority, favorites, search, filters, removal, archiving and schedule reset. Remove from My Words deletes that saved word’s notes and schedule, closes affected unfinished sessions, and adjusts an unfinished active daily set. Past activity and shared teaching content remain. Archive is the reversible alternative. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
+The wordbook supports notes, original context, tags, priority, favorites, search, filters, removal, archiving and schedule reset. **I already know this word** moves a card to its own filter and keeps it out of daily sets, lessons, reviews, recommendations, and memory totals until the learner moves it back to practice. Remove from My Words deletes that saved word’s notes and schedule, closes affected unfinished sessions, and adjusts an unfinished active daily set. Past activity and shared teaching content remain. Archive is the reversible alternative. Progress includes learned/mastered words, XP, practice success, streaks, seven-day activity and milestones. A completed new-word lesson earns 20 XP and a review earns 10. “Mastered” means an interval of at least thirty days and confidence of at least three out of four.
 
-Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions filter unsaved words to the selected level, then rank by usefulness and interests. Search finds both Suggested and My Saved Words across all levels, including learned words. Browsing loads 24 cards at a time. The library contains 400 original lessons: 38 A2, 55 B1, 109 B2 and 198 C1. These are editorial difficulty estimates, not certified CEFR ratings. This is a curated learning library, not a complete dictionary or an unlimited AI recommendation feed. Saved custom lessons expand a learner's available content.
+Preferences include display name, level, interests, timezone, reminders, dark appearance and reduced motion. Suggestions filter unsaved words to the selected level, then rank by usefulness and interests. Search finds both Suggested and My Saved Words across all levels, including learned words. Every Discover card opens a full preview without saving it. Browsing loads 24 cards at a time. The library contains 401 original lessons: 38 A2, 55 B1, 110 B2 and 198 C1. These are editorial difficulty estimates, not certified CEFR ratings. This is a curated learning library, not a complete dictionary or an unlimited AI recommendation feed. Saved custom lessons expand a learner's available content.
 
-Install the website on your Home Screen through your browser. Public assets and a reconnect page work offline; already loaded words remain readable while open. Account changes require a connection. Reminders appear inside the app; the notification control sends an immediate permission test, not scheduled background push. Device pronunciation uses the browser's voice, separate from optional Cambridge audio.
+Add a word accepts Unicode letters and normalizes common variants such as `Touche` to `touché`. Before generating anything, it identifies a matching library or saved card. A close miss shows a **Did you mean…?** choice while preserving the option to keep the learner's spelling. New generated register guidance allows complete sentences; older cached register fragments that ended at the former field limit are shortened to their last complete sentence when displayed.
+
+Install the website on your Home Screen through your browser. Public assets and a reconnect page work offline; already loaded words remain readable while open. Account changes require a connection. Reminders appear inside the app; the notification control sends an immediate permission test, not scheduled background push. Device pronunciation uses the browser's installed voice.
 
 ## How the pieces fit together
 
@@ -45,8 +47,7 @@ Install the website on your Home Screen through your browser. Public assets and 
 Browser → Next.js pages and API routes on Vercel
                     ├─ Supabase Auth: identity and email links
                     ├─ Supabase PostgreSQL: words, profiles and practice data
-                    ├─ OpenAI: new lessons when no stored lesson exists
-                    └─ Cambridge: optional, separately licensed reference
+                    └─ OpenAI: new lessons when no stored lesson exists
 Supabase Auth → Gmail SMTP → verification and recovery emails
 ```
 
@@ -60,8 +61,7 @@ The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreS
 | `lib/spaced-repetition/` | Review scheduling                                                                     |
 | `lib/db/`                | Verified users, private reads and authorized database writes                          |
 | `lib/ai/`                | Lesson schema, original-content prompt and provider                                   |
-| `lib/dictionary/`        | Separate optional Cambridge integration                                               |
-| `data/catalog.ts`        | Original starter lessons plus `data/expanded.ts` and `data/more-words.ts` (400 total) |
+| `data/catalog.ts`        | Original starter lessons plus `data/expanded.ts` and `data/more-words.ts` (401 total) |
 | `supabase/migrations/`   | Versioned SQL schema, policies and functions                                          |
 | `scripts/`               | Database setup, configuration checks and isolated test launchers                      |
 | `tests/`                 | Unit, route, embedded database and browser tests                                      |
@@ -158,7 +158,7 @@ For a quick interface preview before configuring services:
 npm run dev:demo
 ```
 
-This explicitly enables a local **demo mode**: no real accounts, no paid AI calls, and the 400 original library lessons. Practice is stored in this browser's local storage and does not transfer to a real account. A **mock provider** means a local stand-in that returns starter content instead of contacting OpenAI. Production builds disable both demo mode and mock generation so a deployed account app cannot accidentally save users' progress only on their device.
+This explicitly enables a local **demo mode**: no real accounts, no paid AI calls, and the 401 original library lessons. Practice is stored in this browser's local storage and does not transfer to a real account. A **mock provider** means a local stand-in that returns starter content instead of contacting OpenAI. Production builds disable both demo mode and mock generation so a deployed account app cannot accidentally save users' progress only on their device.
 
 ## Environment variables
 
@@ -176,10 +176,6 @@ Public variables beginning with `NEXT_PUBLIC_` may appear in browser JavaScript.
 | `DATABASE_URL`                         | Required for migrations/seed | **Not needed**                    | **Secret**; PostgreSQL setup connection              |
 | `OPENAI_API_KEY`                       | Your project API key         | Your project API key              | **Secret**; server-side AI access                    |
 | `OPENAI_MODEL`                         | `gpt-5.6-terra`              | `gpt-5.6-terra`                   | Server config; same fallback if unset                |
-| `CAMBRIDGE_API_KEY`                    | Optional; empty              | Optional; omit                    | **Secret**; licensed API access                      |
-| `CAMBRIDGE_DICTIONARY_CODE`            | Optional; empty              | Optional; omit                    | Server config; licensed dataset                      |
-| `CAMBRIDGE_LICENSE_CONFIRMED`          | `false`                      | `false`                           | Server config; explicit license gate                 |
-| `CAMBRIDGE_AUDIO_LICENSE_CONFIRMED`    | `false`                      | `false`                           | Server config; separate audio-rights gate            |
 
 The current deployment uses Supabase project `https://zpmutfqbklrvwwzizkuv.supabase.co`. That URL is public configuration, not a credential. Maintainers use that project's keys privately; a separate installation should create its own project and use its own values. The template intentionally contains no actual keys or database passwords.
 
@@ -218,7 +214,7 @@ The current files are `001_initial.sql`, `002_production.sql`, `003_vocabulary_p
 
 The seed inserts exactly **20 original starter lessons** in a fresh database, with **20 meaning rows and 40 example rows**. It is safe to repeat: existing canonical lessons are preserved. A used database can contain more than twenty words because generated lessons are stored there too.
 
-Tables include profiles, shared words/meanings/examples, private saved words, daily sets and their items, review events, suggestion feedback, generation and dictionary quotas, aliases, generation leases and the migration ledger. New Auth users get a profile automatically through a database trigger. Older accounts without a profile receive one on their first successful state write.
+Tables include profiles, shared words/meanings/examples, private saved words, daily sets and their items, review events, suggestion feedback, generation quotas, aliases, generation leases and the migration ledger. New Auth users get a profile automatically through a database trigger. Older accounts without a profile receive one on their first successful state write.
 
 Run these read-only checks in Supabase SQL Editor:
 
@@ -358,13 +354,9 @@ An SDK `insufficient_quota` code/type is treated as billing quota; other HTTP 42
 
 Costs depend on model, input/output tokens and new lessons requested. Prepaid funding amounts and automatic reload are owner choices, not app requirements. Review current [API pricing](https://developers.openai.com/api/docs/pricing) and your project's usage/billing settings. Do not assume an application quota is a monetary spending cap.
 
-## Optional Cambridge reference
+## External dictionary link
 
-Keep all Cambridge fields empty/false unless you have approved API access and the required license. The current app works without it and shows an external Cambridge link on word cards. It does not scrape dictionary pages.
-
-To enable it later, obtain an application-specific API key and dictionary code through [Cambridge's developer service](https://dictionary-api.cambridge.org/), review the agreement, and then configure the key, code and `CAMBRIDGE_LICENSE_CONFIRMED=true`. Enable audio separately only if the agreement permits it.
-
-Lookups happen only after pressing the button. The first supplied entry is displayed separately in a script-disabled frame with attribution and a source link. Cambridge content is not saved in the wordbook database, browser local storage, exports, service-worker cache or AI prompts. Missing entries or audio leave the original lesson available. Registration alone does not establish production licensing rights.
+Each word card has an **Open in Cambridge Dictionary** link. It is a normal browser link to Cambridge's public website with the word in the URL. LexiLoop has no Cambridge API integration, keys, provider, proxy route, embedded result, or Cambridge audio. It does not scrape, fetch, cache, save, export, or send Cambridge content to AI.
 
 ## Vercel deployment
 
@@ -424,7 +416,7 @@ On macOS with nvm, run `nvm use` first. On Linux CI, Playwright uses `npx playwr
 
 Automated tests do not send real email or consume OpenAI credits. Database tests use PGlite, an embedded PostgreSQL engine, with simulated Supabase Auth roles. They execute the migration runner, SQL policies and database functions. Account browser tests run the actual Next.js routes and SSR cookies against a local Auth stand-in; learning journeys use local demo state. These are useful integration checks, but they do not establish hosted email delivery or production persistence.
 
-Browser tests start their own servers sequentially on `127.0.0.1:4172` and `:4173`, with a local Auth fixture on `:4174`. They override service settings with test values and refuse to reuse a running server. Stop other processes using these test ports. The account server disables real AI and Cambridge. Optional Today screenshots use `E2E_SCREENSHOTS=true`; normal account screenshots and failure traces go to ignored `test-results/` paths.
+Browser tests start their own servers sequentially on `127.0.0.1:4172` and `:4173`, with a local Auth fixture on `:4174`. They override service settings with test values and refuse to reuse a running server. Stop other processes using these test ports. The account server disables real AI. Optional Today screenshots use `E2E_SCREENSHOTS=true`; normal account screenshots and failure traces go to ignored `test-results/` paths.
 
 For an explicitly requested live sign-in smoke test, set `E2E_BASE_URL` to the HTTPS deployment origin and `E2E_EMAIL` / `E2E_PASSWORD` to a dedicated confirmed test account in your private shell environment. Then run `npx playwright test --config playwright.live.config.ts`. This separate configuration never starts a local server and disables traces, screenshots and video. It is excluded from normal automated verification; it logs in and out but does not send email or request AI content. Never put real test passwords in command examples or committed files.
 
@@ -507,7 +499,7 @@ Inspect runtime logs and follow the post-deployment checklist. Check missing env
 
 ## Security, cost and operations
 
-Secrets stay in ignored `.env.local`, Vercel's private environment or Supabase SMTP settings. Do not commit them, put them into screenshots, or prefix them with `NEXT_PUBLIC_`. `lib/db`, OpenAI and Cambridge provider modules have server-only import boundaries. Mutating APIs check the exact request origin and verify identity before privileged work. Authentication cookies are HttpOnly and SameSite=Lax, and Secure in production; session refresh follows Supabase SSR patterns.
+Secrets stay in ignored `.env.local`, Vercel's private environment or Supabase SMTP settings. Do not commit them, put them into screenshots, or prefix them with `NEXT_PUBLIC_`. `lib/db` and OpenAI provider modules have server-only import boundaries. Mutating APIs check the exact request origin and verify identity before privileged work. Authentication cookies are HttpOnly and SameSite=Lax, and Secure in production; session refresh follows Supabase SSR patterns.
 
 No analytics, payment system, Redis, cron job, storage bucket or external font service is required. Learners do not supply their own OpenAI keys. The code can be developed locally with free tools, but running the complete live app is not guaranteed to be free: OpenAI bills usage and other services have plan limits. Gmail is the private deployment's email choice; transactional email and custom domains are optional future costs.
 
@@ -565,10 +557,10 @@ Enable **Learning tips** in Settings or accept **Show me how**. Short tips appea
 
 Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 003 has been applied to your hosted project or replace a real cross-device acceptance check. No live database migration or deployment is performed just by editing this repository.
 
-### Mixed lessons, search, and original scenes
+### Mixed lessons, search, and real-life examples
 
 A new daily lesson introduces the whole selected set before testing. For example, ten active learned words plus five new words produce practice for all fifteen. Exercise rounds shuffle word order, while preserving each word's teaching sequence. Recent mistakes add targeted exercises for earlier words. Each completed word updates its own schedule and evidence once; the next checkpoint commits in the same transaction. The full task order, per-word answers, personal sentences, and position survive reloads and midnight. Older saved lesson formats remain readable. Longer sessions can be paused; they are not truncated to the separate Review page's thirty-word batch.
 
 Search ignores the source tab, category and level while text is entered, so a specific saved or suggested word remains findable. Clear the search to return to browsing filters. Saved priorities can still be recommended outside the selected difficulty because the learner explicitly chose them. Existing saved cards retain their stored explanations when a library update introduces the same spelling.
 
-Word details and the introduction phase include an expandable **original mini-scene**, a meaning explanation, and a situation to connect to daily conversation. Many expanded examples use fictional comedy, mystery, or adventure settings. They are not quotations from Friends, The Office, It's Always Sunny, or any existing film or game. No licensed screen-dialogue collection or new dictionary integration is included. Contextual tips explain search, mixed practice, and removal when those controls appear, following the user's existing tips preference.
+Word details and the introduction phase focus on meaning, original real-life examples, practical usage, distinctions, and a situation connected to daily conversation. Examples are original teaching material and are not quotations from Friends, The Office, It's Always Sunny, or any existing film or game. Contextual tips explain search, previews, spelling help, mixed practice, known words, and removal when those controls appear, following the user's existing tips preference.

@@ -1,3 +1,15 @@
+# Accent handling, known words, and navigation polish — 2026-09-19
+
+The curated library now contains 401 cards, including `touché`. Unicode input and accent-insensitive comparison make `Touché` and `Touche` resolve to the same card. Add a word now reports exact library and personal duplicates, offers close spelling suggestions, and preserves an explicit choice to keep the typed spelling. Known words have a separate saved status and are excluded from daily sets, recommendations, lessons, review queues, and memory totals until restored to practice.
+
+The protected app now uses one persistent layout and store across sections. Static page imports and Next link prefetching remove the repeated section workload screen. A pre-interactive theme script plus ready-gated theme persistence prevents dark mode from being overwritten during hydration. The initial account load uses a theme-aware skeleton. Discover cards open complete word details without saving; the original screen-scene panel and Cambridge API/provider have been removed. Word cards retain only an ordinary external Cambridge website link. Generated register guidance now permits complete sentences, while old cached fragments ending at the former limit display through their last complete sentence.
+
+Validation passed with Node 24: lint, TypeScript, 114 unit/route/embedded-database tests, production configuration checks, and the optimized Next.js build. The final browser run passed 57 demo tests on desktop and mobile with three intentional screenshot/matrix skips, followed by all 12 account-fixture tests on desktop, tablet, and mobile. Coverage includes accent variants, autocorrection, duplicate notices, known-word filtering, clickable Discover details, dark reload/navigation, daily-ring label bounds at eight widths, cumulative learning, review persistence, and account flows. A clean `npm ci` repaired duplicate generated dependency folders; a follow-up scan found zero numbered duplicates.
+
+These source changes are local until committed, pushed, and deployed. Run `npm run db:seed` against the intended database during deployment so the new curated card exists before an account saves it; the repeatable seed preserves existing word content and progress.
+
+---
+
 # Library expanded to 400 — 2026-09-14
 
 Added 176 original cards in `data/more-words.ts`: 80 C1, 60 B2, 24 B1 and 12 A2. The complete library now has 400 unique words (38 A2, 55 B1, 109 B2, 198 C1). Each added card has two original examples and four exercises. A separate batch preserves earlier exercise choices. Increased the seed subprocess output limit because the serialized library now exceeds 1 MiB.
@@ -104,7 +116,7 @@ npm run test:e2e
 npm run build
 ```
 
-`npm run verify` combines lint, typecheck, unit/database tests and build. `npm run test:e2e` runs the demo learning suite and then the account fixture suite, each on its own controlled local server. It does not use real Supabase accounts, Gmail, Cambridge or OpenAI credentials. Optional screenshot captures are enabled by `E2E_SCREENSHOTS=true`; the only other intentional skip is a duplicate phone-width matrix already exercised by the desktop project.
+`npm run verify` combines lint, typecheck, unit/database tests and build. `npm run test:e2e` runs the demo learning suite and then the account fixture suite, each on its own controlled local server. It does not use real Supabase accounts, Gmail or OpenAI credentials. Optional screenshot captures are enabled by `E2E_SCREENSHOTS=true`; the only other intentional skip is a duplicate phone-width matrix already exercised by the desktop project.
 
 ## Coverage and limits
 
@@ -121,7 +133,7 @@ npm run build
 - GitHub Actions run `34718739654` for that existing commit completed successfully. This is not CI evidence for unpushed maintenance edits.
 - The production root returned HTTP 307 to `/login`; unauthenticated `/api/state` returned 401, no private state and `Cache-Control: no-store`.
 - A read-only transaction against the configured Supabase database found both migration ledger entries, all 14 public app tables with RLS enabled, 20 stored lessons, 20 meanings and 40 examples. Inspected policies matched owner-only private reads and authenticated shared-content reads.
-- Local configuration presence/modes were checked without printing values: real accounts, local HTTP origin, OpenAI/model selection and disabled Cambridge matched the intended setup. No duplicate entries were found.
+- Local configuration presence/modes were checked without printing values: real accounts, local HTTP origin and OpenAI/model selection matched the intended setup. No duplicate entries were found.
 
 ## Security checks
 
@@ -129,7 +141,7 @@ The final scan found no matches across 116 current files, all 106 reachable hist
 
 ## Still requires hosted acceptance
 
-Follow the README checklist for real signup and Gmail confirmation delivery, recovery email and reset links, cross-device persistence, second-account privacy, paid generation with the configured model and cache reuse. These are not implied by a successful build, fixture tests or read-only database inspection. No paid smoke request or deliberate credit exhaustion was performed. Cambridge is intentionally disabled. Actual Gmail dashboard settings, OpenAI billing/model permissions, backup restoration and physical iPhone/Safari behavior require separate verification.
+Follow the README checklist for real signup and Gmail confirmation delivery, recovery email and reset links, cross-device persistence, second-account privacy, paid generation with the configured model and cache reuse. These are not implied by a successful build, fixture tests or read-only database inspection. No paid smoke request or deliberate credit exhaustion was performed. Actual Gmail dashboard settings, OpenAI billing/model permissions, backup restoration and physical iPhone/Safari behavior require separate verification.
 
 ## Optional tutorial update — 2026-09-13
 

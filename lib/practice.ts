@@ -142,6 +142,7 @@ export function recommendations(
       return (
         (saved || w.difficulty === state.settings.level) &&
         !saved?.archived &&
+        !saved?.known &&
         !saved?.schedule.firstLearned &&
         !state.dismissed.includes(w.word)
       );
@@ -159,17 +160,18 @@ export function recommendations(
     }));
 }
 export function containsWord(text: string, word: string) {
-  return (
-    ' ' +
-    text
+  const clean = (value: string) =>
+    value
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
       .toLowerCase()
-      .replace(/[^a-z' -]/g, ' ')
-      .replace(/\s+/g, ' ') +
-    ' '
-  ).includes(' ' + word.toLowerCase() + ' ');
+      .replace(/[^\p{L}' -]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return ` ${clean(text)} `.includes(` ${clean(word)} `);
 }
 export function memoryMetrics(state: State) {
-  const words = state.words.filter((w) => !w.archived);
+  const words = state.words.filter((w) => !w.archived && !w.known);
   return {
     encountered: words.length,
     learned: words.filter((w) => w.schedule.firstLearned).length,
@@ -198,7 +200,9 @@ export function createMixedSession(
   const words = [
     ...new Set([
       ...newWords,
-      ...state.words.filter((w) => !w.archived && w.schedule.firstLearned).map((w) => w.word),
+      ...state.words
+        .filter((w) => !w.archived && !w.known && w.schedule.firstLearned)
+        .map((w) => w.word),
     ]),
   ];
   const draft = createSession(state, words, 'learn', day, id, eventId);

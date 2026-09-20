@@ -11,7 +11,6 @@ import {
   weakSkills,
   type SessionDraft,
 } from '@/lib/practice';
-import { ScreenScene } from '../words/screen-scene';
 import { ContextTip } from '../tutorial';
 import { ArrowRight, Check, Volume2, Lightbulb, Trophy, X } from 'lucide-react';
 import { useStore } from '../store';
@@ -345,7 +344,7 @@ export function Session({
           }
         >
           {current === 'Discover'
-            ? 'Read the meaning and examples for every new word first. Open the mini-scene for another way to picture it.'
+            ? 'Read the meaning, real-world examples, and practical usage for every new word first.'
             : 'Exercises switch between your new and previously learned words. Recent mistakes add targeted questions. You can pause at any point; the same order and answers will resume.'}
         </ContextTip>
       )}
@@ -405,7 +404,6 @@ export function Session({
             </p>
             <p className="definition">{word.meanings[0].definition}</p>
             <blockquote>{word.meanings[0].examples[0]}</blockquote>
-            <ScreenScene word={word} />
             <div className="memory-hook">
               <Lightbulb size={23} />
               <p>{word.meanings[0].simple}</p>

@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { initialState, applyCommand, todaySet, dayKey, metrics } from '@/lib/domain';
 import { freshSchedule, scheduleReview } from '@/lib/spaced-repetition';
-import { inputWordSchema, normalizeWord } from '@/lib/validation/word';
+import { inputWordSchema, normalizeWord, comparableWord, suggestWord } from '@/lib/validation/word';
 import { validateWord } from '@/lib/ai/schemas';
 import { catalog } from '@/data/catalog';
+import { displayRegister } from '@/lib/word-content';
+import { containsWord } from '@/lib/practice';
 const now = new Date('2026-09-12T12:00:00Z');
 describe('spaced repetition', () => {
   it('expands on remembered words and shortens on lapses', () => {
@@ -101,7 +103,61 @@ describe('content validation', () => {
   });
   it('rejects non-word instructions and normalizes input', () => {
     expect(inputWordSchema.parse('  ClArIfY ')).toBe('clarify');
+    expect(inputWordSchema.parse('Touché')).toBe('touché');
+    expect(inputWordSchema.parse('Touche')).toBe('touché');
+    expect(comparableWord('touché')).toBe(comparableWord('touche'));
+    expect(containsWord('I had to say touche after that point.', 'touché')).toBe(true);
+    expect(
+      suggestWord(
+        'relucatnt',
+        catalog.map((word) => word.word),
+      ),
+    ).toBe('reluctant');
     expect(() => inputWordSchema.parse('<script>alert(1)</script>')).toThrow();
+  });
+  it('accepts complete register guidance beyond the old 120-character cap', () => {
+    const word = structuredClone(catalog[0]);
+    word.register =
+      'Neutral to formal. Common in careful conversation, professional writing, and explanations where the speaker wants to be precise.';
+    expect(validateWord(word).register).toBe(word.register);
+  });
+  it('hides an old cached register fragment at its last complete sentence', () => {
+    const word = structuredClone(catalog[0]);
+    word.register =
+      'Neutral to formal; especially common in business, management, science, and academic writing. It can sound like jargon if';
+    expect(displayRegister(word)).toBe(
+      'Neutral to formal; especially common in business, management, science, and academic writing.',
+    );
+  });
+});
+
+describe('known words', () => {
+  it('keeps known words in a separate list and out of the daily loop', () => {
+    let state = applyCommand(
+      initialState(),
+      { type: 'save', word: 'reluctant', source: 'personal', toToday: true },
+      catalog,
+      now,
+    );
+    state = applyCommand(state, { type: 'know', word: 'reluctant' }, catalog, now);
+    expect(state.words[0].known).toBe(true);
+    expect(todaySet(state, now).words).toEqual([]);
+    expect(metrics(state, now).learned).toBe(0);
+    expect(() => applyCommand(state, { type: 'select', word: 'reluctant' }, catalog, now)).toThrow(
+      'unlearned, active',
+    );
+    state = applyCommand(state, { type: 'practice-word', word: 'reluctant' }, catalog, now);
+    expect(state.words[0].known).toBe(false);
+    expect(applyCommand(state, { type: 'select', word: 'reluctant' }, catalog, now)).toBeDefined();
+  });
+  it('can put an unsaved library word directly in Already know', () => {
+    const state = applyCommand(
+      initialState(),
+      { type: 'know', word: 'touché', source: 'suggested' },
+      catalog,
+      now,
+    );
+    expect(state.words[0]).toMatchObject({ word: 'touché', known: true, source: 'suggested' });
   });
 });
 
