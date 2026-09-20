@@ -27,7 +27,11 @@ export async function proxy(request: NextRequest) {
       },
     },
   );
-  try { await db.auth.getUser(); } catch { /* Protected pages and APIs independently verify identity. */ }
+  try {
+    await db.auth.getUser();
+  } catch {
+    /* Protected pages and APIs independently verify identity. */
+  }
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }

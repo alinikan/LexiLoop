@@ -8,17 +8,19 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node scripts/test-e2e.mjs",
     "format": "prettier --write .",
+    "format:check": "prettier --check . --ignore-unknown",
+    "integrity:check": "node scripts/check-integrity.mjs",
     "db:migrate": "node scripts/database.mjs migrate",
     "db:seed": "node scripts/database.mjs seed",
     "library:index": "node --import tsx scripts/editorial-index.ts",
     "library:check": "node --import tsx scripts/check-library.ts",
     "check:production": "node scripts/check-production.mjs",
     "dev:demo": "node scripts/dev-demo.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run library:check && npm test && npm run build"
+    "verify": "npm run integrity:check && npm run format:check && npm run lint && npm run typecheck && npm run library:check && npm test && npm run build && npm run integrity:check"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -47,6 +49,6 @@
     "vitest": "^4.0.0"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": "24.x"
   }
 }

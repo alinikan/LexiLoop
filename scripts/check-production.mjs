@@ -34,12 +34,20 @@ for (const name of [
   'SUPABASE_SECRET_KEY',
   'OPENAI_API_KEY',
   'ADMIN_EMAILS',
+])
+  if (!process.env[name]?.trim()) problems.push(`${name} is missing.`);
+const signupNotificationNames = [
   'RESEND_API_KEY',
   'SIGNUP_NOTIFICATION_TO',
   'SIGNUP_NOTIFICATION_FROM',
   'SIGNUP_WEBHOOK_SECRET',
-])
-  if (!process.env[name]?.trim()) problems.push(`${name} is missing.`);
+];
+if (signupNotificationNames.some((name) => process.env[name]?.trim()))
+  for (const name of signupNotificationNames)
+    if (!process.env[name]?.trim())
+      problems.push(
+        `${name} is missing; configure all signup-notification values or none of them.`,
+      );
 for (const email of (process.env.ADMIN_EMAILS ?? '').split(',').filter(Boolean))
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
     problems.push('ADMIN_EMAILS must contain comma-separated email addresses.');
@@ -48,7 +56,7 @@ if (
   !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.SIGNUP_NOTIFICATION_TO)
 )
   problems.push('SIGNUP_NOTIFICATION_TO must be an email address.');
-if ((process.env.SIGNUP_WEBHOOK_SECRET?.length ?? 0) < 32)
+if (process.env.SIGNUP_WEBHOOK_SECRET && (process.env.SIGNUP_WEBHOOK_SECRET?.length ?? 0) < 32)
   problems.push('SIGNUP_WEBHOOK_SECRET must contain at least 32 characters.');
 if (
   process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||

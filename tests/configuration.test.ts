@@ -38,6 +38,20 @@ it('accepts the production origin without requiring DATABASE_URL', () => {
   expect(result.status).toBe(0);
   expect(result.stdout).not.toContain('private-fixture');
 });
+it('allows signup alerts to be disabled but rejects partial notification setup', () => {
+  const disabled = Object.fromEntries(
+    [
+      'RESEND_API_KEY',
+      'SIGNUP_NOTIFICATION_TO',
+      'SIGNUP_NOTIFICATION_FROM',
+      'SIGNUP_WEBHOOK_SECRET',
+    ].map((name) => [name, '']),
+  );
+  expect(run(disabled).status).toBe(0);
+  const partial = run({ ...disabled, SIGNUP_NOTIFICATION_TO: 'owner@example.com' });
+  expect(partial.status).toBe(1);
+  expect(partial.stderr).toContain('configure all signup-notification values or none of them');
+});
 it('explains valid local HTTP settings without weakening deployment HTTPS checks', () => {
   const result = run({ NEXT_PUBLIC_APP_URL: 'http://localhost:3000' });
   expect(result.status).toBe(1);

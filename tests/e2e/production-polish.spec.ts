@@ -133,8 +133,8 @@ test('narrow phone screens support forms, dark mode and all navigation without o
   await expect(page.getByText(/Opening your word/i)).toHaveCount(0);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  expect(await page.locator('body').evaluate((body) => getComputedStyle(body).backgroundColor)).toBe(
-    'rgb(20, 24, 39)',
-  );
+  expect(
+    await page.locator('body').evaluate((body) => getComputedStyle(body).backgroundColor),
+  ).toBe('rgb(20, 24, 39)');
   expect(errors).toEqual([]);
 });

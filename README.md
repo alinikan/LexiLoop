@@ -6,7 +6,7 @@ LexiLoop helps you expand your vocabulary and use new words naturally in everyda
 
 [Open LexiLoop](https://lexiloop-ali.vercel.app) · [Source repository](https://github.com/alinikan/LexiLoop)
 
-The current deployment is a small private app hosted on Vercel, with real Supabase accounts, Gmail SMTP delivery through Supabase, and OpenAI lesson generation using `gpt-5.6-terra`. A custom domain, Resend account, and Vercel Marketplace database integration are not required.
+The current deployment is a small private app hosted on Vercel, with real Supabase accounts, Gmail SMTP delivery through Supabase, OpenAI lesson generation using `gpt-5.6-terra`, and optional operator signup alerts through Resend. A custom domain and a Vercel Marketplace database integration are not required. Resend is required only when signup alerts are enabled.
 
 ## Contents
 
@@ -16,6 +16,7 @@ The current deployment is a small private app hosted on Vercel, with real Supaba
 - [Environment variables](#environment-variables)
 - [Supabase database and authentication](#supabase-database-and-authentication)
 - [Gmail SMTP and email templates](#gmail-smtp-and-email-templates)
+- [Signup notifications and user management](#signup-notifications-and-user-management)
 - [OpenAI setup and generation](#openai-setup-and-generation)
 - [External dictionary link](#external-dictionary-link)
 - [New vocabulary tools and upgrade steps](#vocabulary-experience-recommendations-recall-and-everyday-use)
@@ -51,6 +52,7 @@ Browser → Next.js pages and API routes on Vercel
                     ├─ Supabase PostgreSQL: words, profiles and practice data
                     └─ OpenAI: new lessons when no stored lesson exists
 Supabase Auth → Gmail SMTP → verification and recovery emails
+Confirmed signup → Supabase Database Webhook → LexiLoop API → Resend → operator
 ```
 
 The project uses Next.js 16 App Router, React 19, TypeScript, Supabase, PostgreSQL, the OpenAI SDK, Zod validation, Vitest and Playwright. Node 24 is the recommended runtime. Exact dependency versions come from `package-lock.json`.
@@ -180,10 +182,12 @@ Public variables beginning with `NEXT_PUBLIC_` may appear in browser JavaScript.
 | `OPENAI_API_KEY`                       | Your project API key         | Your project API key              | **Secret**; server-side AI access                    |
 | `OPENAI_MODEL`                         | `gpt-5.6-terra`              | `gpt-5.6-terra`                   | Server config; same fallback if unset                |
 | `ADMIN_EMAILS`                         | Operator email               | Operator email                    | Server-only admin-dashboard allowlist                |
-| `RESEND_API_KEY`                       | Resend API key               | Resend API key                    | **Secret**; confirmed-signup alert delivery          |
-| `SIGNUP_NOTIFICATION_TO`               | Operator inbox               | Operator inbox                    | Server-only signup-alert destination                 |
-| `SIGNUP_NOTIFICATION_FROM`             | Verified sender              | Verified sender                   | Server-only Resend sender name/address               |
+| `RESEND_API_KEY`                       | When alerts are enabled      | When alerts are enabled           | **Secret**; confirmed-signup alert delivery          |
+| `SIGNUP_NOTIFICATION_TO`               | When alerts are enabled      | When alerts are enabled           | Server-only signup-alert destination                 |
+| `SIGNUP_NOTIFICATION_FROM`             | Test or verified sender      | Test or verified sender           | Server-only Resend sender name/address               |
 | `SIGNUP_WEBHOOK_SECRET`                | 32+ random characters        | Same secret                       | **Secret**; authenticates the Supabase webhook       |
+
+The four signup-notification values form one optional group: configure all four to enable alerts, or leave all four empty when alerts are disabled. `npm run check:production` rejects a partial group because it would leave confirmed-signup events queued without a working sender.
 
 The current deployment uses Supabase project `https://zpmutfqbklrvwwzizkuv.supabase.co`. That URL is public configuration, not a credential. Maintainers use that project's keys privately; a separate installation should create its own project and use its own values. The template intentionally contains no actual keys or database passwords.
 
@@ -218,7 +222,7 @@ npm run db:seed
 
 A **migration** is a versioned SQL file that creates or changes database structures. The runner holds a database lock so two migration processes do not apply the same file simultaneously. It records completed files in `public.lexiloop_migrations`, the **migration ledger**. Each file and its ledger entry commit together, or both roll back on failure. Re-running skips recorded files.
 
-The current files are `001_initial.sql` through `005_catalog_and_signup_operations.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 005 adds indexed catalog metadata and the private confirmed-signup notification outbox. It does not delete existing progress. Run `npm run db:seed` after the migration: the expanded library must exist in the shared database before users save its new words. Seeding runs in batches, inserts missing entries, refreshes search metadata and preserves canonical cards already used by learners. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
+The current files are `001_initial.sql` through `006_accent_insensitive_search.sql`. **Existing installations must run `npm run db:migrate` before deploying this vocabulary update.** Migration 005 adds indexed catalog metadata and the private confirmed-signup notification outbox. Migration 006 repairs and enforces accent-insensitive search keys for existing and future shared words. Neither deletes existing progress. Run `npm run db:seed` after the migrations: the expanded library must exist in the shared database before users save its new words. Seeding runs in batches, inserts missing entries, refreshes search metadata and preserves canonical cards already used by learners. Do not edit an already applied file to update a live schema; add a new migration. If SQL was previously applied manually without ledger entries, inspect the actual schema before running it again.
 
 The seed inserts exactly **5,000 lessons** in a fresh database: 401 editorial lessons and 4,599 generated lessons. It is safe to repeat. AI-generated personal requests can add further shared cards later.
 
@@ -239,7 +243,7 @@ from pg_policies where schemaname = 'public'
 order by tablename, policyname;
 ```
 
-The ledger should list all five migrations. `stored_lessons` should be at least 5,000 after seeding. All LexiLoop tables, including the ledger, should have row security enabled.
+The ledger should list all six migrations. `stored_lessons` should be at least 5,000 after seeding. All LexiLoop tables, including the ledger, should have row security enabled.
 
 ### How the 5,000-word library is built
 
@@ -353,16 +357,29 @@ The `/auth/confirm` route verifies the token hash server-side, creates authentic
 
 ## Signup notifications and user management
 
-LexiLoop records a private outbox event only after Supabase marks a new email as confirmed. A signed database webhook calls a server route, which retrieves the email with the Supabase Auth admin API and sends one operator alert through Resend. The event stores delivery state, attempts and a safe error message. A short processing lease prevents concurrent sends, and the Resend idempotency key protects a retry after an uncertain response.
+LexiLoop records a private outbox event only after Supabase marks a new email as confirmed. A signed database webhook calls a server route, which retrieves the email with the Supabase Auth admin API and sends one operator alert through Resend. The event stores delivery state, attempts and a safe error message. A short processing lease prevents concurrent sends, and the Resend idempotency key protects a retry after an uncertain response. Gmail SMTP still sends learner confirmation and recovery messages; Resend sends only the private operator alert.
 
 Configure it in this order:
 
-1. Create a Resend account. For production, verify a sending domain and choose a sender such as `LexiLoop <notifications@your-domain.example>`.
-2. Generate the webhook secret locally with `openssl rand -hex 32`. Put it in `SIGNUP_WEBHOOK_SECRET` in `.env.local` and Vercel. Add `RESEND_API_KEY`, `SIGNUP_NOTIFICATION_TO`, `SIGNUP_NOTIFICATION_FROM`, and your exact sign-in email in `ADMIN_EMAILS`. Never prefix these with `NEXT_PUBLIC_`.
-3. Redeploy after saving the Vercel variables.
-4. In Supabase Dashboard, open **Database → Webhooks** and create an HTTP webhook named `lexiloop-confirmed-signup` for table `public.signup_events`, event **INSERT**, method **POST**.
-5. Set the URL to `https://lexiloop-ali.vercel.app/api/webhooks/signup` (replace the origin for another deployment). Add headers `Content-Type: application/json` and `Authorization: Bearer <the same SIGNUP_WEBHOOK_SECRET>`.
-6. Confirm a new test account. Sign in with an email listed in `ADMIN_EMAILS`, open **Manage users**, and verify both the account and email delivery. Existing confirmed accounts are not retroactively announced.
+1. In Resend, create a **Sending access** API key. If any API key has appeared in chat, source code, a screenshot or a public log, delete that key in **Resend → API Keys** and create a replacement before continuing.
+2. Choose the sender:
+   - For the current private test setup without a custom domain, use `SIGNUP_NOTIFICATION_FROM=LexiLoop <onboarding@resend.dev>`. Resend permits this test sender only when `SIGNUP_NOTIFICATION_TO` is the exact email address registered on the Resend account.
+   - To send to any other address, open **Resend → Domains → Add Domain**, add a sending subdomain such as `send.your-domain.example`, create the DNS records Resend shows at the company that manages the domain's DNS, wait for **Verified**, and use a sender such as `LexiLoop <notifications@send.your-domain.example>`. The DNS company is where the domain's nameservers point, which may differ from the registrar.
+3. On your Mac, open Terminal. The command can run from any folder; running it from the LexiLoop folder is convenient:
+
+   ```bash
+   cd /Users/alinikan/Documents/Codex/2026-09-12/files-pasted-by-the-user-master/outputs/lexiloop
+   openssl rand -hex 32
+   ```
+
+   Copy the single 64-character result. That is `SIGNUP_WEBHOOK_SECRET`; it is unrelated to the Resend API key and must stay private.
+
+4. In Vercel, open the existing **LexiLoop project → Settings → Environment Variables**. Add each name and value separately: `ADMIN_EMAILS`, `RESEND_API_KEY`, `SIGNUP_NOTIFICATION_TO`, `SIGNUP_NOTIFICATION_FROM`, and `SIGNUP_WEBHOOK_SECRET`. Select **Production** for each. Paste values without surrounding quote marks; keep the spaces and angle brackets in the sender value. Mark the API key and webhook secret as sensitive when Vercel offers that option, save, then redeploy the latest `main` deployment so the new runtime can read them.
+5. In Supabase, select `lexiloop-production`, open **Integrations → Database Webhooks**, and stay on **Overview**. Choose the green **Install integration** button in the upper-right. This is the current equivalent of the older “Enable Webhooks” instruction. It provisions the required `pg_net` extension and the `supabase_functions` helper schema. If the integration already says installed, continue.
+6. Open the **Webhooks** tab beside Overview and create an HTTP webhook named `lexiloop-confirmed-signup`: schema `public`, table `signup_events`, event **INSERT**, method **POST**. Set the URL to `https://lexiloop-ali.vercel.app/api/webhooks/signup`. Add `Content-Type: application/json` and `Authorization: Bearer <the exact SIGNUP_WEBHOOK_SECRET value>` as request headers, then save.
+7. Confirm a brand-new test account. Sign in with an email listed in `ADMIN_EMAILS`, open **Manage users**, and verify both the account and alert delivery. Existing confirmed accounts are not announced retroactively. If an alert fails, its queue entry remains available for retry from Manage users.
+
+The application code and migration do not create Supabase's platform integration. If webhook creation reports `schema "supabase_functions" does not exist`, the Database Webhooks integration has not finished provisioning even if `pg_net` is present. Return to **Integrations → Database Webhooks → Overview**, install it, refresh the page, and create the webhook from its **Webhooks** tab. Do not create a replacement `supabase_functions` schema by hand. If the installed integration still has no helper schema, remove and reinstall that integration or contact Supabase support; changing LexiLoop migration 005 will not repair a failed dashboard integration. See [Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks) and [Resend's test-domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
 
 The admin page uses Supabase Auth as its source of truth. It shows confirmed status, created date and last sign-in, supports 50-account pages, and can permanently delete another account after the operator types its exact email. Database foreign keys then cascade through that account's private learning data. It never exposes Auth administration to browser code; every API call verifies the current user against `ADMIN_EMAILS`. Failed signup alerts remain in the private queue and can be retried from this page. Supabase Dashboard → Authentication → Users remains the recovery interface if Resend is unavailable or the app itself cannot load.
 
@@ -411,7 +428,7 @@ The existing chain is **GitHub → Vercel → the existing Supabase project**. U
 
 For a separate deployment, import your authorized GitHub repository into Vercel, choose Next.js, use Node 24 and keep the repository root as the root directory. Use `npm ci` for installation and `npm run build` for the build. This app needs server routes; it is not a static export.
 
-1. Add the Vercel Production variables from the environment table. The app origin is `https://lexiloop-ali.vercel.app` for the existing deployment.
+1. Open **Project → Settings → Environment Variables** and add the Vercel Production variables from the environment table one at a time. The app origin is `https://lexiloop-ali.vercel.app` for the existing deployment. Do not include shell-style quote marks around values.
 2. Mark public `NEXT_PUBLIC_*` values as configuration when Vercel prompts. Exposing the website URL, Supabase project URL and publishable key is intentional. Keep the Supabase/OpenAI/Resend keys and webhook secret private.
 3. Leave `DATABASE_URL` out of the Vercel runtime. Apply migrations from your local setup before code depending on them is deployed.
 4. Deploy the intended Git branch. Changes to Vercel environment values require a **new deployment**. Public variables are incorporated into browser code during the build.
@@ -441,6 +458,8 @@ Run the clean verification sequence from the repository root:
 
 ```bash
 npm ci
+npm run integrity:check
+npm run format:check
 npm run lint
 npm run typecheck
 npm run library:check
@@ -448,19 +467,22 @@ npm test
 npx playwright install chromium
 npm run test:e2e
 npm run build
+npm run integrity:check
 ```
 
 On macOS with nvm, run `nvm use` first. On Linux CI, Playwright uses `npx playwright install --with-deps chromium` to install required system libraries too.
 
-`npm run verify` combines lint, TypeScript, all 5,000-card validation, unit/database tests and the production build. Browser tests remain an explicit command because they need Chromium installed.
+`npm run verify` checks repository integrity before and after the build, then runs formatting, lint, TypeScript generation/checking, all 5,000-card validation, unit/database tests and the production build. Browser tests remain an explicit command because they need Chromium installed.
 
-| Check       | What it exercises                                                                                                     |
-| ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `lint`      | Source-code rules and common mistakes                                                                                 |
-| `typecheck` | TypeScript consistency without changing application output                                                            |
-| `test`      | Learning rules, auth routes, provider errors, configuration, cache/quota behavior and real SQL in embedded PostgreSQL |
-| `test:e2e`  | Learning/demo journeys followed by account forms and real auth routes against a local Auth fixture                    |
-| `build`     | Optimized Next.js production compilation                                                                              |
+| Check             | What it exercises                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `integrity:check` | Duplicate paths, merge markers, UTF-8 validity and local documentation links                                          |
+| `format:check`    | Prettier consistency across source, configuration and documentation                                                   |
+| `lint`            | Source-code rules and common mistakes                                                                                 |
+| `typecheck`       | TypeScript consistency without changing application output                                                            |
+| `test`            | Learning rules, auth routes, provider errors, configuration, cache/quota behavior and real SQL in embedded PostgreSQL |
+| `test:e2e`        | Learning/demo journeys followed by account forms and real auth routes against a local Auth fixture                    |
+| `build`           | Optimized Next.js production compilation                                                                              |
 
 Automated tests do not send real email or consume OpenAI credits. Database tests use PGlite, an embedded PostgreSQL engine, with simulated Supabase Auth roles. They execute the migration runner, SQL policies and database functions. Account browser tests run the actual Next.js routes and SSR cookies against a local Auth stand-in; learning journeys use local demo state. These are useful integration checks, but they do not establish hosted email delivery or production persistence.
 
@@ -520,6 +542,8 @@ npm run verify
 
 Run these only inside the project. `node_modules` and `.next` are generated; your source and `.env.local` are separate. Do not install fake packages with those names or weaken TypeScript checks. Never copy `node_modules` from another installation. If numbered folders reappear after a successful reinstall, check whether a sync, restore, or copy process is recreating generated files. The folder names alone do not identify the cause. Keep active dependencies out of conflicting synchronization workflows; changing TypeScript settings will not repair them.
 
+If they return within minutes and this checkout is inside a synchronized **Desktop** or **Documents** folder, commit and push the source, then clone the repository into a local development folder such as `~/Developer/LexiLoop`. Run `nvm use` and `npm ci` in the new clone. Git contains the application source; `node_modules`, `.next`, test results and local secrets should be regenerated locally rather than synchronized between machines.
+
 ### Migration script says DATABASE_URL is missing
 
 Make sure `.env.local` is beside `package.json`, with exactly one nonempty `DATABASE_URL=` entry. A later duplicate blank entry can override the intended value. This command checks presence without printing the value:
@@ -529,6 +553,10 @@ node --env-file=.env.local -e "console.log(process.env.DATABASE_URL?.trim() ? 'D
 ```
 
 It does not validate the password or network. For connection failures, check direct/Session Pooler settings, database password, TLS and project availability. Never paste the connection string into an issue.
+
+### Creating a database webhook says `supabase_functions` does not exist
+
+Open **Supabase → Integrations → Database Webhooks → Overview** and install the integration before creating the webhook. Enabling `pg_net` alone is insufficient because the dashboard integration also provisions the `supabase_functions.http_request` helper used by database webhooks. After installation, refresh and create the hook from the **Webhooks** tab. Do not add the helper schema or function manually. If an installed integration still shows this error, reinstall that integration or contact Supabase support with the project reference and error; it is a Supabase integration-provisioning problem, not a missing LexiLoop migration.
 
 ### Confirmation or recovery email fails
 
@@ -599,12 +627,12 @@ Enable **Learning tips** in Settings or accept **Show me how**. Short tips appea
 ### Upgrade and acceptance checks
 
 1. Back up your database using your existing operational process.
-2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm migration `005_catalog_and_signup_operations.sql` is in the ledger, then run `npm run db:seed`.
+2. From the existing LexiLoop directory, run `npm run db:migrate` with your private database configuration. Confirm migrations `005_catalog_and_signup_operations.sql` and `006_accent_insensitive_search.sql` are in the ledger, then run `npm run db:seed`.
 3. Run `npm run verify` and `npm run test:e2e` locally.
 4. Deploy the updated code to the existing project.
 5. With a real account, accept an edited recommendation, capture a word, and pause a lesson. Reopen it on another signed-in device and check the exact answer and position. Then verify word-use journal entries and export.
 
-Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migration 005 has been applied to your hosted project, that 5,000 rows were seeded there, or that Resend accepted a live message. No live database migration or deployment is performed just by editing this repository.
+Automated coverage uses isolated demo browser journeys, account-state fixtures and real migration/RLS checks in embedded PostgreSQL. It does not prove that migrations 005–006 have been applied to your hosted project, that 5,000 rows were seeded there, or that Resend accepted a live message. No live database migration or deployment is performed just by editing this repository.
 
 ### Mixed lessons, search, and real-life examples
 

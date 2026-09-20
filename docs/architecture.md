@@ -26,7 +26,7 @@ OpenAI receives only normalized vocabulary input. Canonical content and input-to
 
 The Cambridge control is an ordinary external link. No dictionary provider or API exists in the application runtime.
 
-Confirmed Auth signups enter `signup_events` through a database trigger. The table is a private outbox with no learner policy. A database webhook authenticates to the Next.js handler with a server secret; the handler claims a short lease, retrieves the email through the Supabase Auth admin API, and sends an idempotent Resend request. Failed rows retain bounded error text and can be retried by an allowlisted operator. `ADMIN_EMAILS` is checked after normal Supabase authentication for every user-management request. The browser never receives the Supabase server key or Resend key.
+Confirmed Auth signups enter `signup_events` through a database trigger. The table is a private outbox with no learner policy. The installed Supabase Database Webhooks integration uses `pg_net` and its managed `supabase_functions` helper to call the Next.js handler. The request authenticates with a server secret; the handler claims a short lease, retrieves the email through the Supabase Auth admin API, and sends an idempotent Resend request. Failed rows retain bounded error text and can be retried by an allowlisted operator. `ADMIN_EMAILS` is checked after normal Supabase authentication for every user-management request. The browser never receives the Supabase server key, webhook secret or Resend key.
 
 ## Offline and account boundaries
 

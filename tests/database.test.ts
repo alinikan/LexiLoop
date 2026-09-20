@@ -64,6 +64,14 @@ it('migrates and seeds canonical content with normalized meanings and examples',
   expect(
     (await db.query('select source from words where word=$1', [catalog[0].word])).rows,
   ).toEqual([{ source: 'editorial' }]);
+  const accented = { ...catalog[0], word: 'naïve' };
+  await db.query('select public.cache_lexical_word($1::jsonb)', [JSON.stringify(accented)]);
+  expect(
+    (await db.query('select normalized_word from words where word=$1', [accented.word])).rows,
+  ).toEqual([{ normalized_word: 'naive' }]);
+  expect(
+    (await db.query("select public.lexiloop_normalize_word('Touché') normalized")).rows,
+  ).toEqual([{ normalized: 'touche' }]);
 });
 
 it('captures confirmed signups once and safely claims their notification', async () => {
@@ -252,6 +260,7 @@ it('records migrations in the ledger and safely skips a second run', async () =>
     { name: '003_vocabulary_practice.sql' },
     { name: '004_remove_saved_words.sql' },
     { name: '005_catalog_and_signup_operations.sql' },
+    { name: '006_accent_insensitive_search.sql' },
   ]);
   expect(await migrate(migrationClient())).toEqual([]);
   expect(

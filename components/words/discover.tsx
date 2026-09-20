@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Check, Bookmark, X, Search, ArrowRight, BadgeCheck } from 'lucide-react';
 import { ContextTip } from '../tutorial';
@@ -30,21 +30,42 @@ export function Discover() {
     [detailLoading, setDetailLoading] = useState('');
   const detail = useRef<HTMLElement>(null);
   const today = todaySet(state);
-
-  const localWords = catalog
-    .filter((word) => {
-      const saved = state.words.find((item) => item.word === word.word);
-      if (query.trim()) return comparableWord(word.word).includes(comparableWord(query));
-      return (
-        !state.dismissed.includes(word.word) &&
-        (filter === 'For you' || word.categories.includes(filter)) &&
-        (tab === 'My saved words'
-          ? !!saved && !saved.archived && !today.words.includes(word.word)
-          : !saved && word.difficulty === state.settings.level)
-      );
-    })
-    .sort((a, b) => b.usefulness - a.usefulness)
-    .map(summarizeWord);
+  const trimmedQuery = query.trim();
+  const normalizedQuery = comparableWord(trimmedQuery);
+  const savedWords = useMemo(
+    () => new Map(state.words.map((word) => [word.word, word])),
+    [state.words],
+  );
+  const dismissedWords = useMemo(() => new Set(state.dismissed), [state.dismissed]);
+  const todayWords = useMemo(() => new Set(today.words), [today.words]);
+  const catalogByWord = useMemo(() => new Map(catalog.map((word) => [word.word, word])), [catalog]);
+  const localWords = useMemo(
+    () =>
+      catalog
+        .filter((word) => {
+          const saved = savedWords.get(word.word);
+          if (normalizedQuery) return comparableWord(word.word).includes(normalizedQuery);
+          return (
+            !dismissedWords.has(word.word) &&
+            (filter === 'For you' || word.categories.includes(filter)) &&
+            (tab === 'My saved words'
+              ? !!saved && !saved.archived && !todayWords.has(word.word)
+              : !saved && word.difficulty === state.settings.level)
+          );
+        })
+        .sort((a, b) => b.usefulness - a.usefulness)
+        .map(summarizeWord),
+    [
+      catalog,
+      dismissedWords,
+      filter,
+      normalizedQuery,
+      savedWords,
+      state.settings.level,
+      tab,
+      todayWords,
+    ],
+  );
 
   const fetchPage = useCallback(
     async (offset: number, append: boolean, signal?: AbortSignal) => {
@@ -52,9 +73,9 @@ export function Discover() {
         offset: String(offset),
         limit: String(PAGE_SIZE),
       });
-      if (query.trim()) parameters.set('q', query.trim());
+      if (trimmedQuery) parameters.set('q', trimmedQuery);
       else if (tab === 'Suggested') parameters.set('level', state.settings.level);
-      if (filter !== 'For you' && (tab === 'Suggested' || query.trim()))
+      if (!trimmedQuery && filter !== 'For you' && tab === 'Suggested')
         parameters.set('category', filter);
       setLoading(true);
       setLoadError('');
@@ -63,9 +84,8 @@ export function Discover() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
         const items = (data.items as CatalogSummary[]).filter((word) => {
-          const saved = state.words.find((item) => item.word === word.word);
-          if (query.trim()) return true;
-          return !saved && !state.dismissed.includes(word.word);
+          if (trimmedQuery) return true;
+          return !savedWords.has(word.word) && !dismissedWords.has(word.word);
         });
         setRemote((previous) => {
           const merged = append ? [...previous, ...items] : items;
@@ -82,11 +102,11 @@ export function Discover() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [filter, query, state.dismissed, state.settings.level, state.words, tab],
+    [dismissedWords, filter, savedWords, state.settings.level, tab, trimmedQuery],
   );
 
   useEffect(() => {
-    if (demoMode || (tab === 'My saved words' && !query.trim())) return;
+    if (demoMode || (tab === 'My saved words' && !trimmedQuery)) return;
     setRemoteReady(false);
     const controller = new AbortController();
     const timer = setTimeout(() => void fetchPage(0, false, controller.signal), 120);
@@ -94,19 +114,19 @@ export function Discover() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [fetchPage, query, tab]);
+  }, [fetchPage, tab, trimmedQuery]);
 
-  const useLocal = demoMode || (tab === 'My saved words' && !query.trim()) || !remoteReady;
+  const useLocal = demoMode || (tab === 'My saved words' && !trimmedQuery) || !remoteReady;
   const words = useLocal ? localWords.slice(0, limit) : remote;
   const resultCount = useLocal ? localWords.length : total;
 
   async function ensureWord(name: string) {
-    return catalog.find((word) => word.word === name) ?? (await loadWord(name));
+    return catalogByWord.get(name) ?? (await loadWord(name));
   }
   async function add(name: string, toToday: boolean) {
     try {
       await ensureWord(name);
-      if (!state.words.some((word) => word.word === name)) {
+      if (!savedWords.has(name)) {
         if (await dispatch({ type: 'save', word: name, source: 'suggested', toToday }))
           notify(toToday ? 'Added to today’s wordlist.' : 'Saved to your wordbook.');
         return;
@@ -206,7 +226,7 @@ export function Discover() {
         )}
       </div>
       <p className="notice" role="status">
-        {query.trim()
+        {trimmedQuery
           ? 'Searching Suggested and My Saved Words, across every level.'
           : tab === 'Suggested'
             ? `Showing ${state.settings.level} words. Change your level in Settings.`
@@ -242,87 +262,83 @@ export function Discover() {
         </p>
       )}
       <div className="discovery-grid" aria-busy={loading}>
-        {words.map((word, index) => (
-          <article className="discovery-card" key={word.word}>
-            <div className="card-top">
-              <span className={'category color-' + (index % 4)}>{word.categories[0]}</span>
-              {!state.words.some((saved) => saved.word === word.word) && (
-                <button
-                  className="icon-button"
-                  disabled={busy}
-                  aria-label={`Not interested in ${word.word}`}
-                  onClick={() => void dispatch({ type: 'dismiss', word: word.word })}
-                >
-                  <X size={17} />
-                </button>
-              )}
-            </div>
-            <button
-              className="discovery-open"
-              disabled={detailLoading === word.word}
-              onClick={() => void openWord(word.word)}
-            >
-              <h2>{word.word}</h2>
-              <span className="word-meta">
-                {word.partOfSpeech} <span>·</span> {word.difficulty} <span>·</span> Useful
-              </span>
-              <p>{word.definition}</p>
-              <span className="text-link">
-                {detailLoading === word.word ? 'Opening…' : 'View meanings & examples'}
-              </span>
-            </button>
-            {state.words.some((saved) => saved.word === word.word) && (
-              <Link
-                className="text-link"
-                href={`/collection?word=${encodeURIComponent(word.word)}`}
-              >
-                In My Saved Words
-              </Link>
-            )}
-            <div className="card-actions">
+        {words.map((word, index) => {
+          const saved = savedWords.get(word.word);
+          const inToday = todayWords.has(word.word);
+          return (
+            <article className="discovery-card" key={word.word}>
+              <div className="card-top">
+                <span className={'category color-' + (index % 4)}>{word.categories[0]}</span>
+                {!saved && (
+                  <button
+                    className="icon-button"
+                    disabled={busy}
+                    aria-label={`Not interested in ${word.word}`}
+                    onClick={() => void dispatch({ type: 'dismiss', word: word.word })}
+                  >
+                    <X size={17} />
+                  </button>
+                )}
+              </div>
               <button
-                className="button secondary"
-                disabled={
-                  busy ||
-                  today.started ||
-                  today.words.length >= today.goal ||
-                  today.words.includes(word.word) ||
-                  state.words.some(
-                    (saved) =>
-                      saved.word === word.word &&
-                      (saved.archived || saved.known || !!saved.schedule.firstLearned),
-                  )
-                }
-                onClick={() => void add(word.word, true)}
+                className="discovery-open"
+                disabled={detailLoading === word.word}
+                onClick={() => void openWord(word.word)}
               >
-                {today.words.includes(word.word) ? <Check size={17} /> : <Plus size={17} />}
-                Add to today
+                <h2>{word.word}</h2>
+                <span className="word-meta">
+                  {word.partOfSpeech} <span>·</span> {word.difficulty} <span>·</span> Useful
+                </span>
+                <p>{word.definition}</p>
+                <span className="text-link">
+                  {detailLoading === word.word ? 'Opening…' : 'View meanings & examples'}
+                </span>
               </button>
-              {!state.words.some((saved) => saved.word === word.word) && (
-                <button
-                  className="icon-button bookmark"
-                  disabled={busy}
-                  onClick={() => void add(word.word, false)}
-                  aria-label={`Save ${word.word} for later`}
+              {saved && (
+                <Link
+                  className="text-link"
+                  href={`/collection?word=${encodeURIComponent(word.word)}`}
                 >
-                  <Bookmark size={20} />
-                </button>
+                  In My Saved Words
+                </Link>
               )}
-              <button
-                className="button quiet"
-                disabled={
-                  busy || state.words.some((saved) => saved.word === word.word && saved.known)
-                }
-                onClick={() => void know(word.word)}
-              >
-                <BadgeCheck size={17} />
-                {state.words.some((saved) => saved.word === word.word && saved.known)
-                  ? 'Already know'
-                  : 'I know this'}
-              </button>
-            </div>
-          </article>
-        ))}
+              <div className="card-actions">
+                <button
+                  className="button secondary"
+                  disabled={
+                    busy ||
+                    today.started ||
+                    today.words.length >= today.goal ||
+                    inToday ||
+                    (saved && (saved.archived || saved.known || !!saved.schedule.firstLearned))
+                  }
+                  onClick={() => void add(word.word, true)}
+                >
+                  {inToday ? <Check size={17} /> : <Plus size={17} />}
+                  Add to today
+                </button>
+                {!saved && (
+                  <button
+                    className="icon-button bookmark"
+                    disabled={busy}
+                    onClick={() => void add(word.word, false)}
+                    aria-label={`Save ${word.word} for later`}
+                  >
+                    <Bookmark size={20} />
+                  </button>
+                )}
+                <button
+                  className="button quiet"
+                  disabled={busy || saved?.known}
+                  onClick={() => void know(word.word)}
+                >
+                  <BadgeCheck size={17} />
+                  {saved?.known ? 'Already know' : 'I know this'}
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
       {loading && !words.length && (
         <div className="catalog-skeleton" aria-label="Finding words" role="status">
@@ -332,7 +348,7 @@ export function Discover() {
         </div>
       )}
       {((demoMode && localWords.length > limit) ||
-        (!demoMode && hasMore && !(tab === 'My saved words' && !query.trim()))) && (
+        (!demoMode && hasMore && !(tab === 'My saved words' && !trimmedQuery))) && (
         <button
           className="button secondary"
           disabled={loading}

@@ -12,6 +12,7 @@ The **README is the complete, current setup manual**. Follow it for Supabase, SM
 - Local HTTP is valid for development. Use `npm run check:production -- --app-url https://lexiloop-ali.vercel.app` to check deployment-style configuration without changing `.env.local`. This overrides only the origin, not other settings or Vercel values.
 - `npm run check:production` validates production variable presence/origins/modes without printing values. It is not a live credential or billing test.
 - Public previews should use an isolated Supabase project. Never use untrusted preview branches with production secrets or broad auth redirects.
+- Operator signup alerts require the Resend server variables and a signed Database Webhook. Install it from **Supabase → Integrations → Database Webhooks → Overview** before creating the hook on `public.signup_events`. The README records the exact headers, Vercel fields and no-domain Resend test-sender restriction.
 
 ## Failure and recovery
 
@@ -23,4 +24,4 @@ Back up the database according to your plan and data importance, and rehearse re
 
 In-app reminders and immediate browser notification tests require no cron/push infrastructure. This release does not send scheduled background push notifications.
 
-The vocabulary update requires `003_vocabulary_practice.sql` before deployment. Run `npm run db:migrate` from the existing checkout; it adds private profile workspace storage and extends atomic saves. Do not rerun old SQL manually or recreate the database. The README includes upgrade and real-account resume checks.
+The current release requires all migrations through `006_accent_insensitive_search.sql`. Run `npm run db:migrate` from the existing checkout, then `npm run db:seed` to load the complete searchable catalog. The runner applies only missing migrations and the repeatable seed preserves existing canonical cards and learner progress. Do not rerun old SQL manually, edit an applied migration, or recreate the database. The Supabase Database Webhooks integration is separate platform configuration and is not installed by migration 005.
